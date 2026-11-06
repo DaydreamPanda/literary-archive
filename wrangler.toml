@@ -5,8 +5,4 @@ compatibility_date = "2026-02-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "novel-db"
-database_id = "807ef966-4df8-4eca-bcad-95d186775be0"
-
-[[r2_buckets]]
-binding = "R2"
-bucket_name = "novel-storage"
+database_id = "ea855dee-3803-4c6b-a4db-0be5abc7cb3d"
