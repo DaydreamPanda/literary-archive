@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>章节结构编辑 · 文学档案馆</title><link rel="stylesheet" href="./archive.css"><script src="./archive-structure-admin.js" defer></script></head>
+<body><header class="site-head"><a class="site-identity" href="./index.html"><span class="site-seal">文</span><span><span class="site-name">章节结构编辑</span><span class="site-kicker">CHAPTER ORGANIZATION</span></span></a><nav class="site-nav"><a href="./index.html">返回首页</a><a href="./admin.html">小说管理</a><a href="./archive-moderation.html">评论审核</a></nav></header>
+<main class="admin-shell" style="max-width:1120px">
+<div class="eyebrow">AUTHOR TOOLS</div><h1>设置「章 → 节」目录</h1>
+<p class="tool-note">原 Novel Site 的每一个「章节」相当于这里的一节正文。将多个章节的「所属大章」写成完全一样的名字，就会合并到同一个可展开的大章。<strong>一个大章只有一节时，读者点击大章即可直接阅读。</strong> 原小说内容不会被修改。</p>
+<div id="structure-status" class="admin-info" aria-live="polite">正在读取管理员权限…</div>
+<div id="structure-tools" class="hidden">
+<div class="tool-actions"><label for="structure-book">选择系列：</label><select id="structure-book" class="field-input" style="width:auto;max-width:360px"></select><a id="structure-preview" class="soft-btn" href="./index.html">查看系列页面</a></div>
+<div style="overflow-x:auto"><table class="structure-table"><thead><tr><th style="min-width:170px">原后台章节 / 排序</th><th>所属大章（相同则合并）</th><th>节标题（展开后显示）</th><th>分类</th></tr></thead><tbody id="structure-rows"></tbody></table></div>
+<div class="tool-actions"><button class="admin-primary" type="button" id="save-structure">保存章节结构</button><button class="tool-button" type="button" id="preview-structure">预览分组摘要</button></div><div id="structure-summary" class="tool-note"></div>
+<p class="tool-note">新增正文、修改具体节内容、上传封面，请继续使用 <a href="./admin.html"><u>原作品管理后台</u></a>。新增章节后再来此页面设置所属大章即可。正文和番外分别成组。</p>
+</div>
+</main></body></html>

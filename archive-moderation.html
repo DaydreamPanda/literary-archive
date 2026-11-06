@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>匿名评论审核 · 文学档案馆</title><link rel="stylesheet" href="./archive.css"><script src="./archive-moderation.js" defer></script></head>
+<body><header class="site-head"><a href="./index.html" class="site-identity"><span class="site-seal">文</span><span><span class="site-name">匿名评论审核</span><span class="site-kicker">COMMENT MODERATION</span></span></a><nav class="site-nav"><a href="./index.html">首页</a><a href="./archive-admin.html">作者资料</a><a href="./archive-structure.html">章节结构</a></nav></header>
+<main class="admin-shell"><div class="eyebrow">AUTHOR TOOLS</div><h1>审核读者评论</h1><p class="tool-note">读者无需账户，评论默认等待审核。通过后，阅读页统一显示「读者评论」，不出现用户名，也没有回复层级。这里可以通过、拒绝或永久删除评论。</p>
+<div id="mod-status" class="admin-info" aria-live="polite">正在确认作者身份…</div>
+<div class="tool-actions"><label for="mod-filter">查看：</label><select id="mod-filter" class="field-input" style="width:auto"><option value="pending">待审核</option><option value="approved">已公开</option><option value="rejected">已拒绝</option></select><button type="button" class="tool-button" id="mod-refresh">刷新</button></div>
+<div id="mod-list"></div></main></body></html>
