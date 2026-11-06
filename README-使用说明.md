@@ -99,3 +99,5 @@ functions/api/admin/archive-comments.js      超级管理员评论审核
 - 未完成真实 Cloudflare 环境端到端测试，请先在测试项目发布，确认后台权限、D1 数据、评论审核和作品目录正常。
 
 原项目：https://github.com/xingzihai/novel-site
+
+<!-- Redeploy after configuring ADMIN_PASSWORD -->
