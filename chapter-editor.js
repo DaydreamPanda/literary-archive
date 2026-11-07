@@ -9,8 +9,8 @@
   let bookData = null, tagList = [], selectedTags = new Set(), savedTags = '';
   let bookDescription = '', hasChapterCover = false, hasBookCover = false;
   let ready = false, saving = false, savingMeta = false, bookSaving = false;
-  let showPreview = false, suppressUnload = false;
-  const historyStack = [], redoStack = [];
+  let suppressUnload = false;
+  let richEditor = null;
   const validId = id => /^\d{1,18}$/.test(id || '') && Number(id) > 0;
   const trim = s => s.trim();
   const wordCount = () => trim(body.value).length;
@@ -39,7 +39,7 @@
     const indicator = $('#sync-indicator');
     indicator.textContent = changed() ? '● 有未保存的修改' : '✓ 正文已保存';
     if (!saving) message($('#save-status'), changed() ? '请保存修改，快捷键 ⌘ S / Ctrl S' : '正文已保存到 D1');
-    if (showPreview) renderPreview();
+
   }
   function selectedTagIds() {return [...selectedTags].sort((a,b)=>a-b);}
   function renderTags() {
@@ -102,6 +102,9 @@
       await fetchBook();
       if (chapterId) await fetchChapterMeta();
       savedTitle = chapterId ? trim(title.value) : '';
+      savedBody = chapterId ? trim(body.value) : '';
+      await mountRichEditor();
+      // Vditor may normalize existing Markdown while loading; avoid false dirty warnings.
       savedBody = chapterId ? trim(body.value) : '';
       ready=true;
       $('#workspace').hidden=false;
@@ -193,44 +196,43 @@
       if(/冲突|修改|409/.test(e.message))showError('服务器中的章节已有其他修改，请先复制当前文字保存到本机，再刷新页面。');
     } finally {saving=false;update();}
   }
-  function remember() {historyStack.push({text:body.value,start:body.selectionStart,end:body.selectionEnd});if(historyStack.length>60)historyStack.shift();redoStack.length=0;}
-  function restore(stack,other){const state=stack.pop();if(!state)return;other.push({text:body.value,start:body.selectionStart,end:body.selectionEnd});body.value=state.text;body.focus();body.setSelectionRange(state.start,state.end);update();}
-  function format(kind) {
-    if(kind==='undo'){restore(historyStack,redoStack);return;}
-    if(kind==='redo'){restore(redoStack,historyStack);return;}
-    if(showPreview) togglePreview(false);
-    body.focus();remember();
-    const a=body.selectionStart,b=body.selectionEnd;
-    if(kind==='bold'||kind==='italic'){
-      const mark=kind==='bold'?'**':'*';const selection=body.value.slice(a,b)||'文字';
-      body.setRangeText(mark+selection+mark,a,b,'select');
-      body.setSelectionRange(a+mark.length,a+mark.length+selection.length);
-    } else {
-      const start=body.value.lastIndexOf('\n',Math.max(0,a-1))+1;
-      let end=body.value.indexOf('\n',b);if(end<0)end=body.value.length;
-      const selected=body.value.slice(start,end);
-      const prefix=kind==='h2'?'## ':kind==='h3'?'### ':'> ';
-      const replaced=selected.split('\n').map(line=>{
-        const clean=line.replace(/^\s*(?:#{2,3}\s+|>\s?)/,'');return prefix+clean;
-      }).join('\n');
-      body.setRangeText(replaced,start,end,'select');
+  async function mountRichEditor() {
+    if (typeof window.Vditor !== 'function') {
+      throw Error('Vditor 编辑器加载失败，请检查网络或刷新页面。');
     }
-    update();
-  }
-  function renderPreview(){
-    $('#inline-preview').innerHTML=window.ArchiveMarkdown ? window.ArchiveMarkdown.render(body.value) : '';
-  }
-  function togglePreview(force){
-    showPreview=typeof force==='boolean'?force:!showPreview;
-    $('#inline-preview').hidden=!showPreview;
-    body.hidden=showPreview;
-    $('#inline-preview-btn').textContent=showPreview?'返回写作':'预览排版';
-    if(showPreview)renderPreview();else body.focus();
+    const initialMarkdown = body.value;
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(Error('Vditor 初始化超时，请刷新重试。')), 15000);
+      try {
+        richEditor = new window.Vditor('vditor-editor', {
+          value: initialMarkdown,
+          lang: 'zh_CN',
+          cdn: 'https://cdn.jsdelivr.net/npm/vditor@4.0.1',
+          mode: 'wysiwyg',
+          height: 'auto',
+          minHeight: 500,
+          theme: 'classic',
+          cache: { enable: false },
+          placeholder: '从这里开始写你的故事……',
+          // Match the site's currently supported safe reader Markdown subset.
+          toolbar: ['headings', 'bold', 'italic', 'quote', '|', 'undo', 'redo', '|', 'edit-mode', 'fullscreen'],
+          input: markdown => {
+            body.value = typeof markdown === 'string' ? markdown : richEditor.getValue();
+            if (ready) update();
+          },
+          after: () => {
+            clearTimeout(timeout);
+            body.value = richEditor.getValue();
+            resolve();
+          },
+        });
+      } catch (e) { clearTimeout(timeout); reject(e); }
+    });
   }
   $('#chapter-form').addEventListener('submit',e=>{e.preventDefault();void saveChapter();});
   saveBtn.addEventListener('click',()=>void saveChapter());
   previewBtn.addEventListener('click',()=>{if(!chapterId||changed())return;window.open('/read.html?id='+encodeURIComponent(chapterId),'_blank','noopener,noreferrer');});
-  title.addEventListener('input',update);body.addEventListener('input',update);
+  title.addEventListener('input',update);
   $('#chapter-summary').addEventListener('input',update);$('#book-description').addEventListener('input',update);
   $('#chapter-cover').addEventListener('change',e=>{if(e.target.files?.[0])coverPreview(e.target.files[0],'#chapter-cover-preview');update();});
   $('#book-cover').addEventListener('change',e=>{if(e.target.files?.[0])coverPreview(e.target.files[0],'#book-cover-preview');update();});
@@ -246,13 +248,10 @@
     try{const data=await request('/api/admin/tags',payload({name},'POST'));tagList.push(data.tag);selectedTags.add(Number(data.tag.id));input.value='';renderTags();update();message($('#book-meta-status'),'新 Tag 已创建，请点击「保存作品资料」完成关联。');}
     catch(e){message($('#book-meta-status'),'添加 Tag 失败：'+e.message,true);}
   });
-  document.querySelector('.format-toolbar').addEventListener('click',e=>{const b=e.target.closest('button[data-format]');if(b)format(b.dataset.format);});
-  $('#inline-preview-btn').addEventListener('click',()=>togglePreview());
   document.addEventListener('keydown',e=>{
     if(!(e.metaKey||e.ctrlKey))return;
     const k=e.key.toLowerCase();
     if(k==='s'){e.preventDefault();void saveChapter();}
-    if(k==='b'&&document.activeElement===body){e.preventDefault();format('bold');}
   });
   window.addEventListener('beforeunload',e=>{if(dirty()&&!suppressUnload){e.preventDefault();e.returnValue='';}});
   let theme='paper';try{theme=localStorage.getItem('archive-theme')||'paper';}catch{}

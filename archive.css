@@ -241,3 +241,9 @@ input,textarea{color:var(--ink)}
 .prose strong{font-weight:700}
 .prose em{font-style:italic}
 .read-intro .chapter-summary{font-size:13px;line-height:1.8;color:var(--ink-soft);white-space:pre-line;max-width:610px;margin:12px 0}
+
+/* Vditor-compatible chapter headings; keep old H2/H3 styling unchanged. */
+.prose h1,.prose h4,.prose h5,.prose h6{font-weight:600;line-height:1.55;text-indent:0;color:var(--ink);letter-spacing:.03em}
+.prose h1{font-size:1.38em;margin:2em 0 .85em}
+.prose h4{font-size:1.03em;margin:1.4em 0 .6em}
+.prose h5,.prose h6{font-size:1em;margin:1.25em 0 .55em}

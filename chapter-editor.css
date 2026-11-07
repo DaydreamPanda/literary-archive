@@ -52,3 +52,21 @@
 @media(max-width:640px){.editor-wrap{padding:15px 13px 70px}.editor-hero{flex-direction:column;align-items:stretch}.editor-toolbar button{flex:1}.editor-form{padding:20px 17px 13px}.chapter-title-input{font-size:23px}.chapter-body-input{font-size:16px}.metadata-column{grid-template-columns:1fr}.format-rule{margin:0 1px}.format-toolbar .format-preview{margin-left:0}.editor-hero h1{font-size:26px}}
 /* Hidden must win over component display styles, including pre-login state. */
 [hidden]{display:none!important}
+
+/* Vditor 4.0.1, upstream MIT open-source editor. */
+.panda-vditor {margin:2px 0 20px; min-height:500px;}
+.panda-vditor .vditor {border:1px solid var(--rule);border-radius:5px;overflow:hidden;background:var(--paper-light);}
+.panda-vditor .vditor-toolbar {background:var(--paper);border-bottom:1px solid var(--rule);}
+.panda-vditor .vditor-toolbar__item {color:var(--ink-soft);}
+.panda-vditor .vditor-toolbar__item:hover {background:var(--paper-soft);}
+.panda-vditor .vditor-content,.panda-vditor .vditor-wysiwyg {background:var(--paper-light);}
+.panda-vditor .vditor-wysiwyg {padding:14px 22px;}
+.panda-vditor .vditor-wysiwyg .vditor-reset {font-family:Songti SC,Noto Serif CJK SC,Source Han Serif SC,SimSun,Georgia,serif;
+  color:var(--ink);font-size:17px;line-height:2.05;}
+.panda-vditor .vditor-wysiwyg .vditor-reset p {margin:0 0 1.15em;}
+.panda-vditor .vditor-reset blockquote {border-left:3px solid var(--accent);padding-left:18px;color:var(--ink-soft);background:var(--paper-soft);}
+.panda-vditor .vditor-reset h2,.panda-vditor .vditor-reset h3 {color:var(--ink);font-family:inherit;font-weight:600;}
+:root[data-archive-theme="night"] .panda-vditor .vditor {background:var(--paper-light);}
+:root[data-archive-theme="night"] .panda-vditor .vditor-reset {color:var(--ink)!important;}
+:root[data-archive-theme="night"] .panda-vditor .vditor-toolbar {background:var(--paper-soft);}
+@media(max-width:640px){.panda-vditor .vditor-wysiwyg{padding:12px 10px}.panda-vditor .vditor-wysiwyg .vditor-reset{font-size:16px}}

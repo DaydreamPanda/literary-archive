@@ -27,7 +27,7 @@
     for (const original of lines) {
       const line = original.trim();
       if (!line) { flushParagraph();flushQuote();continue; }
-      const heading = /^(#{2,3})\s+(.+)$/.exec(line);
+      const heading = /^(#{1,6})\s+(.+)$/.exec(line);
       const quoted = /^>\s?(.*)$/.exec(line);
       if (heading) {
         flushParagraph();flushQuote();
