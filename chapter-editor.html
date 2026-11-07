@@ -6,9 +6,9 @@
   <meta name="robots" content="noindex,nofollow">
   <title>章节写作 · 私人文学档案馆</title>
   <link rel="stylesheet" href="/archive.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vditor@4.0.1/dist/index.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vditor/4.0.1/index.min.css">
   <link rel="stylesheet" href="/chapter-editor.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/vditor@4.0.1/dist/index.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/vditor/4.0.1/index.min.js"></script>
   <script defer src="/chapter-editor.js"></script>
 </head>
 <body>
@@ -32,8 +32,15 @@
           <label class="editor-label" for="chapter-title">章节标题</label>
           <input id="chapter-title" class="chapter-title-input" type="text" maxlength="200" autocomplete="off" placeholder="例如：第一章 · 初见" required>
           <div class="editor-division"><span>正文内容</span><span id="sync-indicator" class="editor-state">已加载</span></div>
-          <label class="visually-hidden" for="chapter-body">章节正文（用于保存）</label>
-          <textarea id="chapter-body" hidden></textarea>
+          <label class="visually-hidden" for="chapter-body">章节正文（用于保存，或编辑器备用模式）</label>
+          <div id="fallback-formatbar" class="format-toolbar" hidden aria-label="Markdown 备用格式工具栏">
+            <button type="button" data-format="bold" title="加粗选中的文字">B</button>
+            <button type="button" data-format="italic" title="斜体">I</button>
+            <button type="button" data-format="h2" title="二级标题">H2</button>
+            <button type="button" data-format="h3" title="三级标题">H3</button>
+            <button type="button" data-format="quote" title="引用">❝ 引用</button>
+          </div>
+          <textarea id="chapter-body" class="chapter-body-input" spellcheck="false" placeholder="从这里开始写你的故事……" hidden></textarea>
           <div id="vditor-editor" class="panda-vditor" aria-label="小说正文所见即所得编辑器"></div>
           <div class="editor-bottom"><span><strong id="word-count">0</strong> 字符 · 保留段落和换行</span><span id="save-status" aria-live="polite">修改后点击保存，或按 ⌘ S</span></div>
         </form>

@@ -108,7 +108,7 @@
       savedBody = chapterId ? trim(body.value) : '';
       ready=true;
       $('#workspace').hidden=false;
-      hideError();update();
+      if (!fallbackMode) hideError();update();
     } catch(e) {showError('无法加载编辑器：'+e.message);}
   }
   async function uploadCover(file, endpoint) {
@@ -196,38 +196,100 @@
       if(/冲突|修改|409/.test(e.message))showError('服务器中的章节已有其他修改，请先复制当前文字保存到本机，再刷新页面。');
     } finally {saving=false;update();}
   }
-  async function mountRichEditor() {
-    if (typeof window.Vditor !== 'function') {
-      throw Error('Vditor 编辑器加载失败，请检查网络或刷新页面。');
-    }
-    const initialMarkdown = body.value;
+  let fallbackMode = false;
+  function switchToPlainEditor(reason) {
+    // Safety first: never prevent the author from editing when a third-party CDN is unavailable.
+    fallbackMode = true;
+    try { richEditor?.destroy?.(); } catch {}
+    $('#vditor-editor').hidden = true;
+    $('#fallback-formatbar').hidden = false;
+    body.hidden = false;
+    body.addEventListener('input', update);
+    showError('富文本编辑器暂时无法加载，已自动切换到可以正常保存的 Markdown 备用编辑器。' +
+      ' 正文仍从 D1 读取，保存不会丢失。你可以稍后再试富文本模式。');
+    console.warn('Vditor fallback enabled:', reason);
+  }
+  function applyFormat(kind) {
+    const s = body.selectionStart, e = body.selectionEnd;
+    const selected = body.value.slice(s, e);
+    let before = '', after = '', sample = '文字';
+    if (kind === 'bold') { before = '**'; after = '**'; }
+    else if (kind === 'italic') { before = '*'; after = '*'; }
+    else if (kind === 'h2' || kind === 'h3' || kind === 'quote') {
+      const prefix = kind === 'h2' ? '## ' : kind === 'h3' ? '### ' : '> ';
+      // Prefix each selected line rather than breaking surrounding text.
+      const from = body.value.lastIndexOf('\n', Math.max(0, s - 1)) + 1;
+      const raw = body.value.slice(from, e);
+      const replacement = raw.split('\n').map(line => prefix + line).join('\n');
+      body.setRangeText(replacement, from, e, 'end');
+      body.focus();
+      update();
+      return;
+    } else return;
+    const replacement = before + (selected || sample) + after;
+    body.setRangeText(replacement, s, e, 'select');
+    body.setSelectionRange(s + before.length, s + before.length + (selected || sample).length);
+    body.focus();
+    update();
+  }
+  $('#fallback-formatbar').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-format]');
+    if (button) applyFormat(button.dataset.format);
+  });
+  async function loadBackupEditorScript() {
+    // cdnjs provides the primary JS/CSS; Vditor's nested assets use unpkg's /dist paths.
+    // If the main script is blocked, try loading the same patched version from unpkg.
+    if (typeof window.Vditor === 'function') return 'https://unpkg.com/vditor@4.0.1';
     await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(Error('Vditor 初始化超时，请刷新重试。')), 15000);
-      try {
-        richEditor = new window.Vditor('vditor-editor', {
-          value: initialMarkdown,
-          lang: 'zh_CN',
-          cdn: 'https://cdn.jsdelivr.net/npm/vditor@4.0.1',
-          mode: 'wysiwyg',
-          height: 'auto',
-          minHeight: 500,
-          theme: 'classic',
-          cache: { enable: false },
-          placeholder: '从这里开始写你的故事……',
-          // Match the site's currently supported safe reader Markdown subset.
-          toolbar: ['headings', 'bold', 'italic', 'quote', '|', 'undo', 'redo', '|', 'edit-mode', 'fullscreen'],
-          input: markdown => {
-            body.value = typeof markdown === 'string' ? markdown : richEditor.getValue();
-            if (ready) update();
-          },
-          after: () => {
-            clearTimeout(timeout);
-            body.value = richEditor.getValue();
-            resolve();
-          },
-        });
-      } catch (e) { clearTimeout(timeout); reject(e); }
+      const script = document.createElement('script');
+      const timeout = setTimeout(() => { script.remove(); reject(new Error('备用 CDN 超时')); }, 8500);
+      script.src = 'https://unpkg.com/vditor@4.0.1/dist/index.min.js';
+      script.onload = () => { clearTimeout(timeout); resolve(); };
+      script.onerror = () => { clearTimeout(timeout); reject(new Error('备用 CDN 加载失败')); };
+      document.head.appendChild(script);
     });
+    if (typeof window.Vditor !== 'function') throw Error('外部编辑器脚本不可用');
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/vditor@4.0.1/dist/index.css';
+    document.head.appendChild(css);
+    return 'https://unpkg.com/vditor@4.0.1';
+  }
+  async function mountRichEditor() {
+    try {
+      const cdnBase = await loadBackupEditorScript();
+      const initialMarkdown = body.value;
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(Error('Vditor 初始化超时')), 16000);
+        try {
+          richEditor = new window.Vditor('vditor-editor', {
+            value: initialMarkdown,
+            lang: 'zh_CN',
+            cdn: cdnBase,
+            mode: 'wysiwyg',
+            height: 'auto',
+            minHeight: 500,
+            theme: 'classic',
+            cache: { enable: false },
+            placeholder: '从这里开始写你的故事……',
+            toolbar: ['headings', 'bold', 'italic', 'quote', '|', 'undo', 'redo', '|', 'edit-mode', 'fullscreen'],
+            input: markdown => {
+              if (fallbackMode) return;
+              body.value = typeof markdown === 'string' ? markdown : richEditor.getValue();
+              if (ready) update();
+            },
+            after: () => {
+              if (fallbackMode) return;
+              clearTimeout(timeout);
+              body.value = richEditor.getValue();
+              resolve();
+            },
+          });
+        } catch (e) { clearTimeout(timeout); reject(e); }
+      });
+    } catch (error) {
+      switchToPlainEditor(error.message || String(error));
+    }
   }
   $('#chapter-form').addEventListener('submit',e=>{e.preventDefault();void saveChapter();});
   saveBtn.addEventListener('click',()=>void saveChapter());

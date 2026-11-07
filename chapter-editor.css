@@ -70,3 +70,8 @@
 :root[data-archive-theme="night"] .panda-vditor .vditor-reset {color:var(--ink)!important;}
 :root[data-archive-theme="night"] .panda-vditor .vditor-toolbar {background:var(--paper-soft);}
 @media(max-width:640px){.panda-vditor .vditor-wysiwyg{padding:12px 10px}.panda-vditor .vditor-wysiwyg .vditor-reset{font-size:16px}}
+
+/* Emergency Markdown editor when a public CDN cannot load. */
+#fallback-formatbar[hidden], #chapter-body[hidden], #vditor-editor[hidden] {display:none!important;}
+#fallback-formatbar {margin-top:8px;margin-bottom:6px;}
+#chapter-body:not([hidden]) {display:block;min-height:420px;white-space:pre-wrap;}
