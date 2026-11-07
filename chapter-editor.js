@@ -237,24 +237,11 @@
     if (button) applyFormat(button.dataset.format);
   });
   async function loadBackupEditorScript() {
-    // cdnjs provides the primary JS/CSS; Vditor's nested assets use unpkg's /dist paths.
-    // If the main script is blocked, try loading the same patched version from unpkg.
-    if (typeof window.Vditor === 'function') return 'https://unpkg.com/vditor@4.0.1';
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      const timeout = setTimeout(() => { script.remove(); reject(new Error('备用 CDN 超时')); }, 8500);
-      script.src = 'https://unpkg.com/vditor@4.0.1/dist/index.min.js';
-      script.onload = () => { clearTimeout(timeout); resolve(); };
-      script.onerror = () => { clearTimeout(timeout); reject(new Error('备用 CDN 加载失败')); };
-      document.head.appendChild(script);
-    });
-    if (typeof window.Vditor !== 'function') throw Error('外部编辑器脚本不可用');
-    const css = document.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = 'https://unpkg.com/vditor@4.0.1/dist/index.css';
-    document.head.appendChild(css);
-    return 'https://unpkg.com/vditor@4.0.1';
+  if (typeof window.Vditor !== 'function') {
+    throw Error('本地 Vditor 未加载：请检查 /vendor/vditor/dist/index.min.js 是否存在。');
   }
+  return location.origin + '/vendor/vditor';
+}
   async function mountRichEditor() {
     try {
       const cdnBase = await loadBackupEditorScript();
@@ -266,6 +253,7 @@
             value: initialMarkdown,
             lang: 'zh_CN',
             cdn: cdnBase,
+            preview: {theme: {path: cdnBase + '/dist/css/content-theme', current: 'light'}},
             mode: 'wysiwyg',
             height: 'auto',
             minHeight: 500,
