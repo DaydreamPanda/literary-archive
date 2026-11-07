@@ -21,11 +21,12 @@ function cookieHeader(token, request) {
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=31536000`;
 }
 async function ensureTable(env) {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS archive_chapter_likes (
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS archive_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     chapter_id INTEGER NOT NULL,
     visitor_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (chapter_id, visitor_hash),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(chapter_id, visitor_hash),
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
   )`).run();
 }
@@ -33,7 +34,7 @@ async function chapterExists(env, id) {
   return env.DB.prepare("SELECT c.id FROM chapters c JOIN books b ON b.id=c.book_id WHERE c.id=? AND (b.status IS NULL OR b.status='normal')").bind(id).first();
 }
 async function countLikes(env, id) {
-  const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM archive_chapter_likes WHERE chapter_id=?').bind(id).first();
+  const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM archive_likes WHERE chapter_id=?').bind(id).first();
   return Number(row?.count) || 0;
 }
 function validChapterId(raw) {
@@ -55,7 +56,7 @@ export async function onRequestGet({ request, env }) {
   let liked = false;
   if (enabled) {
     const hash = await hashedVisitor(env, token);
-    liked = Boolean(await env.DB.prepare('SELECT 1 FROM archive_chapter_likes WHERE chapter_id=? AND visitor_hash=?').bind(id, hash).first());
+    liked = Boolean(await env.DB.prepare('SELECT 1 FROM archive_likes WHERE chapter_id=? AND visitor_hash=?').bind(id, hash).first());
   }
   return Response.json({count:await countLikes(env,id),liked,enabled}, {
     headers:{...noStore,'Set-Cookie':cookieHeader(token,request)}
@@ -78,10 +79,10 @@ export async function onRequestPost({ request, env }) {
   await ensureTable(env);
   const hash = await hashedVisitor(env, token);
   if (body.liked) {
-    await env.DB.prepare('INSERT OR IGNORE INTO archive_chapter_likes(chapter_id,visitor_hash) VALUES(?,?)').bind(id,hash).run();
+    await env.DB.prepare('INSERT OR IGNORE INTO archive_likes(chapter_id,visitor_hash) VALUES(?,?)').bind(id,hash).run();
   } else {
-    await env.DB.prepare('DELETE FROM archive_chapter_likes WHERE chapter_id=? AND visitor_hash=?').bind(id,hash).run();
+    await env.DB.prepare('DELETE FROM archive_likes WHERE chapter_id=? AND visitor_hash=?').bind(id,hash).run();
   }
-  const liked = Boolean(await env.DB.prepare('SELECT 1 FROM archive_chapter_likes WHERE chapter_id=? AND visitor_hash=?').bind(id,hash).first());
+  const liked = Boolean(await env.DB.prepare('SELECT 1 FROM archive_likes WHERE chapter_id=? AND visitor_hash=?').bind(id,hash).first());
   return Response.json({count:await countLikes(env,id),liked,enabled:true}, {headers:noStore});
 }

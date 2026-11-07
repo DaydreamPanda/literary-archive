@@ -1,121 +1,63 @@
-// POST /api/admin/chapters — 创建新章节
+// POST /api/admin/chapters — create chapter with body in D1, not R2.
 import { checkAdmin, validateId, parseJsonBody, checkBookOwnership, requireMinRole } from '../_utils.js';
+import { chapterFitsD1, MAX_CHAPTER_BYTES } from '../_d1-storage.js';
 
-const MAX_CONTENT_LENGTH = 500000; // 50万字
+const MAX_CONTENT_LENGTH = 500000;
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
+export async function onRequestPost({ request, env }) {
   const auth = await checkAdmin(request, env);
-  if (!auth.ok) {
-    const status = auth.reason === 'locked' ? 429 : 401;
-    const msg = auth.reason === 'locked' ? 'Too many failed attempts, try again later' : 'Unauthorized';
-    return Response.json({ error: msg }, { status });
-  }
-
+  if (!auth.ok) return Response.json({ error: 'Unauthorized' }, { status: auth.reason === 'locked' ? 429 : 401 });
   const body = await parseJsonBody(request);
   if (!body) return Response.json({ error: 'Invalid JSON' }, { status: 400 });
-
   const { book_id, title, content, sort_order: clientSortOrder } = body;
-
-  if (!book_id || !validateId(String(book_id))) {
-    return Response.json({ error: 'Valid book_id is required' }, { status: 400 });
+  if (!book_id || !validateId(String(book_id))) return Response.json({ error: 'Valid book_id is required' }, { status: 400 });
+  if (typeof title !== 'string' || !title.trim() || title.length > 200) {
+    return Response.json({ error: 'Title is required (max 200 chars)' }, { status: 400 });
   }
-  if (!title || typeof title !== 'string' || title.trim().length === 0) {
-    return Response.json({ error: 'Title is required' }, { status: 400 });
+  if (typeof content !== 'string' || !content.trim()) return Response.json({ error: 'Content is required' }, { status: 400 });
+  const text = content.trim();
+  if (text.length > MAX_CONTENT_LENGTH || !chapterFitsD1(text)) {
+    return Response.json({ error: `D1 模式下每节正文不能超过 ${MAX_CONTENT_LENGTH} 字符或 ${MAX_CHAPTER_BYTES} 字节` }, { status: 413 });
   }
-  if (title.length > 200) {
-    return Response.json({ error: 'Title too long (max 200)' }, { status: 400 });
-  }
-  if (!content || typeof content !== 'string' || content.trim().length === 0) {
-    return Response.json({ error: 'Content is required' }, { status: 400 });
-  }
-  if (content.length > MAX_CONTENT_LENGTH) {
-    return Response.json({ error: `Content too long (max ${MAX_CONTENT_LENGTH} chars)` }, { status: 400 });
-  }
-
-  const book = await env.DB.prepare('SELECT id FROM books WHERE id = ?')
-    .bind(book_id).first();
+  const book = await env.DB.prepare('SELECT id FROM books WHERE id = ?').bind(book_id).first();
   if (!book) return Response.json({ error: 'Book not found' }, { status: 404 });
-
-  // demo只能往自己的书里添加章节
   if (!await checkBookOwnership(auth, env, book_id)) {
     return Response.json({ error: '只能向自己创建的书籍添加章节' }, { status: 403 });
   }
-
-  // demo 用户配额：每本书最多 200 章
   if (!requireMinRole(auth, 'admin')) {
-    const { count } = await env.DB.prepare(
-      'SELECT COUNT(*) as count FROM chapters WHERE book_id = ?'
-    ).bind(book_id).first();
+    const { count } = await env.DB.prepare('SELECT COUNT(*) AS count FROM chapters WHERE book_id = ?').bind(book_id).first();
     if (count >= 200) return Response.json({ error: '演示账号每本书最多 200 章' }, { status: 403 });
   }
-
-  // sort_order：前端传了就用前端的（批量导入场景），否则自动递增（单章添加场景）
   let sortOrder;
   if (clientSortOrder !== undefined && Number.isInteger(Number(clientSortOrder)) && Number(clientSortOrder) > 0 && Number(clientSortOrder) <= 2147483647) {
     sortOrder = Number(clientSortOrder);
   } else {
-    const lastChapter = await env.DB.prepare(
-      'SELECT MAX(sort_order) as max_order FROM chapters WHERE book_id = ?'
-    ).bind(book_id).first();
-    sortOrder = (lastChapter?.max_order || 0) + 1;
+    const last = await env.DB.prepare('SELECT MAX(sort_order) AS max_order FROM chapters WHERE book_id = ?').bind(book_id).first();
+    sortOrder = (last?.max_order || 0) + 1;
   }
-  const wordCount = content.trim().length;
-
-  // 先插入DB拿到chapterId，用占位content_key
-  let chapterId;
+  // The database already has a chapters.content TEXT column.
+  // A single INSERT guarantees metadata and manuscript text commit together.
   try {
-    const result = await env.DB.prepare(`
-      INSERT INTO chapters (book_id, title, sort_order, word_count, content_key)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(book_id, title.trim(), sortOrder, wordCount, 'pending').run();
-    chapterId = result.meta.last_row_id;
-  } catch (err) {
-    if (err.message && err.message.includes('UNIQUE')) {
-      return Response.json({ success: true, duplicate: true, message: '章节已存在（重复请求）' });
+    const result = await env.DB.prepare(`INSERT INTO chapters
+      (book_id,title,sort_order,word_count,content_key,content)
+      VALUES (?,?,?,?,?,?)`)
+      .bind(book_id, title.trim(), sortOrder, text.length, 'd1', text).run();
+    const chapterId = result.meta.last_row_id;
+    if (!requireMinRole(auth, 'admin')) {
+      const { count } = await env.DB.prepare('SELECT COUNT(*) AS count FROM chapters WHERE book_id=?')
+        .bind(book_id).first();
+      if (count > 200) {
+        await env.DB.prepare('DELETE FROM chapters WHERE id=?').bind(chapterId).run();
+        return Response.json({ error: '演示账号每本书最多 200 章' }, { status: 403 });
+      }
     }
-    return Response.json({ error: 'Failed to create chapter' }, { status: 500 });
-  }
-
-  // 用最终key写R2（只写一次）
-  const contentKey = `novels/books/${book_id}/chapters/${chapterId}.txt`;
-  try {
-    await env.R2.put(contentKey, content.trim());
+    await env.DB.prepare("UPDATE books SET updated_at=datetime('now') WHERE id=?").bind(book_id).run();
+    return Response.json({success:true, chapter:{id:chapterId,title:title.trim(),sort_order:sortOrder,word_count:text.length}}, {status:201});
   } catch (err) {
-    // R2失败，回滚DB
-    await env.DB.prepare('DELETE FROM chapters WHERE id = ?').bind(chapterId).run().catch(() => {});
-    return Response.json({ error: 'Failed to store content' }, { status: 500 });
-  }
-
-  // 更新content_key为最终值
-  try {
-    await env.DB.prepare('UPDATE chapters SET content_key = ? WHERE id = ?')
-      .bind(contentKey, chapterId).run();
-  } catch (err) {
-    // content_key更新失败，回滚DB和R2
-    await env.DB.prepare('DELETE FROM chapters WHERE id = ?').bind(chapterId).run().catch(() => {});
-    await env.R2.delete(contentKey).catch(() => {});
-    return Response.json({ error: 'Failed to finalize chapter' }, { status: 500 });
-  }
-
-  await env.DB.prepare("UPDATE books SET updated_at = datetime('now') WHERE id = ?")
-    .bind(book_id).run();
-
-  // demo章节配额二次检查（防TOCTOU竞态绕过）
-  if (!requireMinRole(auth, 'admin')) {
-    const { count } = await env.DB.prepare(
-      'SELECT COUNT(*) as count FROM chapters WHERE book_id = ?'
-    ).bind(book_id).first();
-    if (count > 200) {
-      await env.DB.prepare('DELETE FROM chapters WHERE id = ?').bind(chapterId).run().catch(() => {});
-      await env.R2.delete(contentKey).catch(() => {});
-      return Response.json({ error: '演示账号每本书最多 200 章' }, { status: 403 });
+    if (String(err).includes('UNIQUE')) {
+      return Response.json({error:'章节排序冲突，请刷新后重试'}, {status:409});
     }
+    console.error('Create D1 chapter failed:', err);
+    return Response.json({error:'章节保存到 D1 失败，请检查数据库字段'}, {status:500});
   }
-
-  return Response.json({
-    success: true,
-    chapter: { id: chapterId, title: title.trim(), sort_order: sortOrder, word_count: wordCount }
-  }, { status: 201 });
 }
