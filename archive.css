@@ -232,3 +232,12 @@ input,textarea{color:var(--ink)}
 .reader-actions .like-button .like-count{font:11px/16px Georgia,serif;font-variant-numeric:tabular-nums;color:var(--muted)}
 .reader-actions .like-button[data-liked="true"] .like-count{color:#b47162}
 .reader-actions .like-button:disabled{cursor:wait;opacity:.6}
+
+/* Safe Markdown rendered in chapters and author preview */
+.prose h2,.prose h3{font-weight:600;letter-spacing:.035em;line-height:1.6;text-indent:0;color:var(--ink)}
+.prose h2{font-size:1.22em;margin:1.9em 0 .7em}
+.prose h3{font-size:1.09em;margin:1.45em 0 .6em}
+.prose .literary-quote{margin:1.25em 0 1.6em;padding:.75em 1.25em;border-left:3px solid var(--accent);background:var(--paper-light);color:var(--ink-soft);font-style:italic;line-height:1.95;white-space:pre-wrap}
+.prose strong{font-weight:700}
+.prose em{font-style:italic}
+.read-intro .chapter-summary{font-size:13px;line-height:1.8;color:var(--ink-soft);white-space:pre-line;max-width:610px;margin:12px 0}

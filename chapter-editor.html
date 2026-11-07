@@ -4,48 +4,83 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>章节编辑 · 私人文学档案馆</title>
+  <title>章节写作 · 私人文学档案馆</title>
   <link rel="stylesheet" href="/archive.css">
   <link rel="stylesheet" href="/chapter-editor.css">
+  <script defer src="/archive-markdown.js"></script>
   <script defer src="/chapter-editor.js"></script>
 </head>
 <body>
   <header class="site-head editor-site-head">
-    <a class="site-identity" href="/index.html" aria-label="返回文学档案馆首页">
-      <span class="site-seal">文</span>
-      <span><span class="site-name">私人文学档案馆</span><span class="site-kicker">CHAPTER WORKSPACE</span></span>
-    </a>
-    <nav class="site-nav" aria-label="导航">
-      <a href="/admin.html">作者后台</a>
-      <button class="icon-button theme-toggle" id="theme-switch" aria-label="切换夜间模式" type="button">☾</button>
-    </nav>
+    <a class="site-identity" href="/index.html"><span class="site-seal">文</span><span><span class="site-name">私人文学档案馆</span><span class="site-kicker">AUTHOR WRITING DESK</span></span></a>
+    <nav class="site-nav"><a href="/admin.html">作者后台</a><button class="icon-button theme-toggle" id="theme-switch" type="button" aria-label="切换日夜模式">☾</button></nav>
   </header>
   <main class="editor-wrap">
-    <div class="editor-breadcrumb"><a id="back-link" href="/admin.html">‹ 返回章节管理</a><span class="breadcrumb-divider">/</span><span id="book-caption">读取作品信息中…</span></div>
-    <div class="editor-hero">
-      <div>
-        <div class="eyebrow">WRITING DESK / 稿纸</div>
-        <h1 id="page-heading">编辑章节</h1>
-        <p id="editor-hint">加载已保存的正文，然后直接在下面修改。</p>
-      </div>
+    <div class="editor-breadcrumb"><a href="/admin.html">‹ 返回章节管理</a><span>/</span><a href="#" id="book-link">读取作品中…</a></div>
+    <section class="editor-hero">
+      <div><div class="eyebrow">WRITING DESK / 稿纸</div><h1 id="page-heading">章节写作</h1><p id="editor-hint">写作、排版与作品资料集中在这里。</p></div>
       <div class="editor-toolbar">
-        <button type="button" id="preview-btn" class="editor-button light" disabled>预览正文 ↗</button>
+        <button type="button" id="preview-btn" class="editor-button light" disabled>打开阅读页 ↗</button>
         <button type="button" id="save-btn" class="editor-button primary" disabled>保存修改</button>
       </div>
-    </div>
+    </section>
     <div class="editor-warning" id="error-panel" role="alert" hidden></div>
-    <form id="chapter-form" class="editor-form" hidden>
-      <label class="editor-label" for="chapter-title">章节标题</label>
-      <input id="chapter-title" class="chapter-title-input" type="text" maxlength="200" required autocomplete="off" placeholder="例如：第一章 · 初见">
-      <div class="editor-division"><span>正文内容</span><span id="sync-indicator" class="editor-state">已加载</span></div>
-      <label class="visually-hidden" for="chapter-body">章节正文</label>
-      <textarea id="chapter-body" class="chapter-body-input" spellcheck="false" placeholder="从这里开始写你的故事……" required></textarea>
-      <div class="editor-bottom">
-        <span><strong id="word-count">0</strong> 字符 <span class="editor-secondary">· 保留段落和换行</span></span>
-        <span id="save-status" aria-live="polite">修改后点击保存，或按 ⌘ S</span>
-      </div>
-    </form>
-    <p class="editor-footnote">正文保存在本站的 Cloudflare D1 数据库中。离开页面前，请确认右上方显示「已保存」。</p>
+    <div class="workspace-grid" id="workspace" hidden>
+      <section class="writing-column">
+        <form id="chapter-form" class="editor-form">
+          <label class="editor-label" for="chapter-title">章节标题</label>
+          <input id="chapter-title" class="chapter-title-input" type="text" maxlength="200" autocomplete="off" placeholder="例如：第一章 · 初见" required>
+          <div class="editor-division"><span>正文内容</span><span id="sync-indicator" class="editor-state">已加载</span></div>
+          <div class="format-toolbar" role="toolbar" aria-label="正文格式工具">
+            <button type="button" data-format="bold" title="加粗 (⌘ B)"><strong>B</strong></button>
+            <button type="button" data-format="italic" title="斜体"><em>I</em></button>
+            <span class="format-rule"></span>
+            <button type="button" data-format="h2" title="二级标题">H2</button>
+            <button type="button" data-format="h3" title="三级标题">H3</button>
+            <button type="button" data-format="quote" title="引用">❝ 引用</button>
+            <span class="format-rule"></span>
+            <button type="button" data-format="undo" title="撤销">↶</button>
+            <button type="button" data-format="redo" title="重做">↷</button>
+            <button type="button" id="inline-preview-btn" class="format-preview">预览排版</button>
+          </div>
+          <label class="visually-hidden" for="chapter-body">章节正文</label>
+          <textarea id="chapter-body" class="chapter-body-input" spellcheck="false" placeholder="从这里开始写你的故事……" required></textarea>
+          <article id="inline-preview" class="prose inline-preview" hidden aria-label="章节排版预览"></article>
+          <div class="editor-bottom"><span><strong id="word-count">0</strong> 字符 · 保留段落和换行</span><span id="save-status" aria-live="polite">修改后点击保存，或按 ⌘ S</span></div>
+        </form>
+        <div class="editor-footnote">文字格式采用 Markdown，支持 **加粗**、*斜体*、## 标题、### 小标题及 &gt; 引用。未保存的文字不会覆盖线上正文。</div>
+      </section>
+      <aside class="metadata-column">
+        <section class="editor-side-card">
+          <div class="eyebrow">CHAPTER DETAILS / 本节资料</div>
+          <h2>章节设置</h2>
+          <label class="editor-label" for="chapter-summary">章节简介（选填）</label>
+          <textarea id="chapter-summary" rows="4" maxlength="800" class="side-textarea" placeholder="简单介绍本节内容，显示在阅读页顶部。"></textarea>
+          <label class="editor-label" for="chapter-cover">章节封面（选填）</label>
+          <img id="chapter-cover-preview" class="cover-preview" alt="章节封面预览" hidden>
+          <input type="file" id="chapter-cover" accept="image/jpeg,image/png,image/webp">
+          <p class="side-note">JPEG / PNG / WebP，压缩后不超过 1 MB；留空则沿用作品封面。</p>
+          <button type="button" class="editor-button light side-action" id="remove-chapter-cover">删除章节封面</button>
+          <p id="chapter-meta-status" class="side-status" aria-live="polite"></p>
+          <button type="button" class="editor-button primary side-action" id="save-chapter-meta" disabled>保存章节设置</button>
+        </section>
+        <section class="editor-side-card">
+          <div class="eyebrow">BOOK DETAILS / 全书资料</div>
+          <h2>作品设置</h2>
+          <p class="side-note">以下内容属于整本书，修改后会影响该作品的所有章节。</p>
+          <label class="editor-label" for="book-cover">作品封面</label>
+          <img id="book-cover-preview" class="cover-preview" alt="作品封面预览" hidden>
+          <input type="file" id="book-cover" accept="image/jpeg,image/png,image/webp">
+          <label class="editor-label" for="book-description">作品简介</label>
+          <textarea id="book-description" rows="5" maxlength="2000" class="side-textarea" placeholder="简介会显示在作品主页。"></textarea>
+          <label class="editor-label">作品 Tags</label>
+          <div id="tag-options" class="tag-options"><span class="side-note">正在读取标签…</span></div>
+          <div class="tag-create"><input id="new-tag-name" type="text" maxlength="50" placeholder="新建 Tag，例如：历史架空"><button type="button" id="create-tag" class="editor-button light">添加</button></div>
+          <p id="book-meta-status" class="side-status" aria-live="polite"></p>
+          <button type="button" class="editor-button primary side-action" id="save-book-meta">保存作品资料</button>
+        </section>
+      </aside>
+    </div>
   </main>
 </body>
 </html>
