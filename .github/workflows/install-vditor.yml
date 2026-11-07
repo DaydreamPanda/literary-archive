@@ -1,0 +1,84 @@
+name: Install self-hosted Vditor
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out website
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Download official Vditor 4.0.1 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p vendor/vditor
+          npm pack vditor@4.0.1 --pack-destination "$RUNNER_TEMP" --silent
+          tar -xzf "$RUNNER_TEMP/vditor-4.0.1.tgz" \
+            -C vendor/vditor --strip-components=1 package/dist package/LICENSE
+          test -s vendor/vditor/dist/index.min.js
+          test -s vendor/vditor/dist/index.css
+
+      - name: Point website at local assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          html = Path('chapter-editor.html')
+          source = html.read_text(encoding='utf-8')
+          css_pattern = r'<link\b[^>]*href="https://(?:cdnjs\.cloudflare\.com/ajax/libs/vditor/4\.0\.1/index(?:\.min)?\.css|(?:cdn\.jsdelivr\.net/npm|unpkg\.com)/vditor@4\.0\.1/dist/index(?:\.min)?\.css)"[^>]*>'
+          js_pattern = r'<script\b[^>]*src="https://(?:cdnjs\.cloudflare\.com/ajax/libs/vditor/4\.0\.1/index(?:\.min)?\.js|(?:cdn\.jsdelivr\.net/npm|unpkg\.com)/vditor@4\.0\.1/dist/index(?:\.min)?\.js)"[^>]*></script>'
+          source, css_count = re.subn(css_pattern, '<link rel="stylesheet" href="/vendor/vditor/dist/index.css">', source)
+          source, js_count = re.subn(js_pattern, '<script defer src="/vendor/vditor/dist/index.min.js"></script>', source)
+          if css_count != 1 or js_count != 1:
+              raise SystemExit(f'Could not locate old Vditor imports (css={css_count}, js={js_count}). No changes made.')
+          html.write_text(source, encoding='utf-8')
+
+          js = Path('chapter-editor.js')
+          source = js.read_text(encoding='utf-8')
+          start_marker = '  async function loadBackupEditorScript() {'
+          end_marker = '  async function mountRichEditor() {'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('Editor initialization markers were not found; no changes made.')
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          replacement = '''  async function loadBackupEditorScript() {
+            if (typeof window.Vditor !== 'function') {
+              throw Error('本地 Vditor 未加载：请检查 /vendor/vditor/dist/index.min.js 是否存在。');
+            }
+            return location.origin + '/vendor/vditor';
+          }
+          '''
+          source = source[:start] + replacement + source[end:]
+          # The Vditor CSS theme also loads from the same origin when available.
+          source = source.replace('            cdn: cdnBase,',
+                                  "            cdn: cdnBase,\n            preview: {theme: {path: cdnBase + '/dist/css/content-theme', current: 'light'}},")
+          js.write_text(source, encoding='utf-8')
+          PY
+          node --check chapter-editor.js
+
+      - name: Commit and publish changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f vendor/vditor/dist vendor/vditor/LICENSE
+          git add chapter-editor.html chapter-editor.js
+          if git diff --cached --quiet; then
+            echo 'Self-hosted Vditor already installed.'
+          else
+            git commit -m 'Self-host Vditor editor assets'
+            git push origin HEAD:main
+          fi
