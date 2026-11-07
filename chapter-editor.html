@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>章节编辑 · 私人文学档案馆</title>
+  <link rel="stylesheet" href="/archive.css">
+  <link rel="stylesheet" href="/chapter-editor.css">
+  <script defer src="/chapter-editor.js"></script>
+</head>
+<body>
+  <header class="site-head editor-site-head">
+    <a class="site-identity" href="/index.html" aria-label="返回文学档案馆首页">
+      <span class="site-seal">文</span>
+      <span><span class="site-name">私人文学档案馆</span><span class="site-kicker">CHAPTER WORKSPACE</span></span>
+    </a>
+    <nav class="site-nav" aria-label="导航">
+      <a href="/admin.html">作者后台</a>
+      <button class="icon-button theme-toggle" id="theme-switch" aria-label="切换夜间模式" type="button">☾</button>
+    </nav>
+  </header>
+  <main class="editor-wrap">
+    <div class="editor-breadcrumb"><a id="back-link" href="/admin.html">‹ 返回章节管理</a><span class="breadcrumb-divider">/</span><span id="book-caption">读取作品信息中…</span></div>
+    <div class="editor-hero">
+      <div>
+        <div class="eyebrow">WRITING DESK / 稿纸</div>
+        <h1 id="page-heading">编辑章节</h1>
+        <p id="editor-hint">加载已保存的正文，然后直接在下面修改。</p>
+      </div>
+      <div class="editor-toolbar">
+        <button type="button" id="preview-btn" class="editor-button light" disabled>预览正文 ↗</button>
+        <button type="button" id="save-btn" class="editor-button primary" disabled>保存修改</button>
+      </div>
+    </div>
+    <div class="editor-warning" id="error-panel" role="alert" hidden></div>
+    <form id="chapter-form" class="editor-form" hidden>
+      <label class="editor-label" for="chapter-title">章节标题</label>
+      <input id="chapter-title" class="chapter-title-input" type="text" maxlength="200" required autocomplete="off" placeholder="例如：第一章 · 初见">
+      <div class="editor-division"><span>正文内容</span><span id="sync-indicator" class="editor-state">已加载</span></div>
+      <label class="visually-hidden" for="chapter-body">章节正文</label>
+      <textarea id="chapter-body" class="chapter-body-input" spellcheck="false" placeholder="从这里开始写你的故事……" required></textarea>
+      <div class="editor-bottom">
+        <span><strong id="word-count">0</strong> 字符 <span class="editor-secondary">· 保留段落和换行</span></span>
+        <span id="save-status" aria-live="polite">修改后点击保存，或按 ⌘ S</span>
+      </div>
+    </form>
+    <p class="editor-footnote">正文保存在本站的 Cloudflare D1 数据库中。离开页面前，请确认右上方显示「已保存」。</p>
+  </main>
+</body>
+</html>
