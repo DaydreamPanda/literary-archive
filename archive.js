@@ -100,7 +100,11 @@
      ['Pixiv','X','AO3'].forEach(name=>{const item=document.createElement('div');item.className='platform-placeholder';item.innerHTML='<span class="platform-monogram"></span><span></span>';item.children[0].textContent=name[0];item.children[1].textContent=name+' · 待设置';links.appendChild(item);});
      const hint=document.createElement('div');hint.className='platform-hint';hint.textContent='可在作者后台添加实际链接';links.appendChild(hint);
    }
-   let books=[];try{books=(await api('/api/books')).books||[];}catch(e){$('#series-list').innerHTML=`<div class="error">作品加载失败：${esc(e.message)}。请确认已部署 Novel Site 的 API。${!demo?'<a href="?demo=1">查看演示</a>':''}</div>`;return;}
+   let books=[];
+try {
+  books = ((await api('/api/books')).books || [])
+    .filter(b => !b.status || b.status === 'normal');
+}catch(e){$('#series-list').innerHTML=`<div class="error">作品加载失败：${esc(e.message)}。请确认已部署 Novel Site 的 API。${!demo?'<a href="?demo=1">查看演示</a>':''}</div>`;return;}
    if(demo)$('#demo-indicator').classList.remove('hidden');
    const input=$('#search-books'),chips=$('#tag-filters');let active='全部';const tagNames=['全部',...new Set(books.flatMap(b=>(b.tags||[]).map(t=>t.name)))];
    function draw(){const term=input.value.trim().toLowerCase();let filtered=books.filter(b=>(active==='全部'||(b.tags||[]).some(t=>t.name===active))&&(!term||[b.title,b.author,b.description,...(b.tags||[]).map(t=>t.name)].join(' ').toLowerCase().includes(term)));const series=filtered.filter(b=>classify(b)==='series'),single=filtered.filter(b=>classify(b)==='single');$('#series-list').innerHTML=series.length?series.map(card).join(''):'<div class="archive-empty">此分类暂无系列作品</div>';$('#single-list').innerHTML=single.length?single.map(card).join(''):'<div class="archive-empty">此分类暂无单篇作品</div>';$('#series-count').textContent=series.length+' 部';$('#single-count').textContent=single.length+' 部';}
