@@ -24,6 +24,13 @@
     return parts.join('/');
   }
   const dirname = file => file.includes('/') ? file.slice(0,file.lastIndexOf('/')) : '';
+  function epubSubjects(opf){
+    const nodes=opf.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/','subject');
+    // EPUB metadata may list the same Pixiv tag more than once.
+    const seen=new Set(), tags=[];
+    for(const el of nodes){const v=trim(el.textContent).slice(0,50);if(v&&!seen.has(v)){seen.add(v);tags.push(v);}}
+    return tags.slice(0,20);
+  }
   function metaByName(xml,name) {
     const arr=xml.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/',name);
     const value=arr.length ? arr[0].textContent : '';
@@ -108,7 +115,48 @@
     const rawDesc=metaByName(opf,'description');
     let desc=rawDesc;
     if(/<[^>]*>/.test(rawDesc))desc=new DOMParser().parseFromString(rawDesc,'text/html').body.textContent||rawDesc;
-    return {zip,items,bookTitle:metaByName(opf,'title')||file.name.replace(/\.epub$/i,''),author:metaByName(opf,'creator'),description:trim(desc).slice(0,2000),coverPath};
+    return {zip,items,bookTitle:metaByName(opf,'title')||file.name.replace(/\.epub$/i,''),author:metaByName(opf,'creator'),description:trim(desc).slice(0,2000),coverPath,subjects:epubSubjects(opf)};
+  }
+  function subjects(){return [...new Set((state.source?.subjects||[]).map(trim).filter(Boolean))].slice(0,20);}
+  function renderSubjects(){
+    const root=$('#pixiv-subject-list');root.replaceChildren();
+    for(let i=0;i<(state.source?.subjects||[]).length;i++){
+      const line=document.createElement('div');line.className='pixiv-tag-row';
+      const input=document.createElement('input');input.type='text';input.maxLength=50;input.value=state.source.subjects[i];
+      input.setAttribute('aria-label','第 '+(i+1)+' 个 EPUB 标签');
+      input.addEventListener('input',()=>{state.source.subjects[i]=input.value;update();});
+      const remove=document.createElement('button');remove.type='button';remove.className='import-btn secondary';remove.textContent='移除';
+      remove.addEventListener('click',()=>{state.source.subjects.splice(i,1);renderSubjects();update();});
+      line.append(input,remove);root.append(line);
+    }
+    if(!root.children.length)root.textContent='此 EPUB 没有标签，你可以添加。';
+  }
+  async function syncBookTags(bookId){
+    if(!validId(bookId))throw Error('作品编号无效');
+    const incoming=subjects();if(!incoming.length){log('EPUB 没有需要补录的标签。');return 0;}
+    const [current,all]=await Promise.all([
+      getJson('/api/books/'+bookId), getJson('/api/admin/tags')
+    ]);
+    const existingIds=new Set((current.book?.tags||[]).map(x=>Number(x.id)));
+    const names=new Map((all.tags||[]).map(x=>[trim(x.name),Number(x.id)]));
+    let added=0;
+    for(const tagName of incoming){
+      let id=names.get(tagName);
+      if(!id){
+        try{const r=await getJson('/api/admin/tags',jsonBody({name:tagName},'POST'));id=Number(r.tag.id);}
+        catch(e){
+          // Another request may have created it since the initial list was fetched.
+          if(/already exists|存在/i.test(e.message)){const fresh=await getJson('/api/admin/tags');id=Number((fresh.tags||[]).find(x=>trim(x.name)===tagName)?.id);}
+          if(!id)throw e;
+        }
+        names.set(tagName,id);
+      }
+      if(!existingIds.has(id)){existingIds.add(id);added++;}
+    }
+    if(existingIds.size>20)throw Error('本书标签总数超过20，请在预览中减少标签');
+    await getJson('/api/admin/book-tags',jsonBody({book_id:Number(bookId),tag_ids:[...existingIds]},'PUT'));
+    log('作品 Tag 已关联：共 '+incoming.length+' 个，新增关联 '+added+' 个。');
+    return added;
   }
   function buildPreview(){
     const tbody=$('#chapter-rows');tbody.replaceChildren();
@@ -121,6 +169,7 @@
       const td2=document.createElement('td');td2.textContent=c.content.length.toLocaleString();
       const td3=document.createElement('td');td3.textContent=c.coverPath?'有':'无';tr.append(td0,td1,td2,td3);tbody.append(tr);
     }
+    renderSubjects();
     $('#preview-step').hidden=false;$('#destination-step').hidden=false;update();
   }
   async function getJson(url,opts={}){
@@ -141,6 +190,7 @@
     const n=state.items.filter(x=>x.checked).length;
     $('#import-summary').textContent='已选择 '+n+' 个篇目';
     $('#start-import').disabled=state.busy||!n||!$('#confirm-import').checked||($('input[name="destination"]:checked')?.value==='new'&&!trim($('#book-name').value));
+    $('#repair-tags').disabled=state.busy||!state.source||$('input[name="destination"]:checked')?.value!=='existing'||!validId($('#existing-book').value)||!subjects().length;
   }
   function guessGroup(title){
     const t=trim(title);
@@ -213,6 +263,9 @@
       const oldStructure=await getJson('/api/archive-structure?bookId='+bookId+'&t='+Date.now()).then(r=>r.items||[]).catch(()=>[]);
       const lastSortOrder=Math.max(0,...(baseInfo.chapters||[]).map(c=>Number(c.sort_order)||0));
       let order=lastSortOrder;
+      if($('#import-book-tags').checked && subjects().length){
+        try{await syncBookTags(bookId);}catch(e){metaWarnings++;log('作品标签关联失败：'+e.message);}
+      }
       if($('#save-book-cover').checked&&state.source.coverPath){
         try{await sendCover(state.source.zip,state.source.coverPath,'/api/admin/covers?book_id='+bookId);log('作品封面已保存。');}
         catch(e){metaWarnings++;log('作品封面导入失败，可稍后单独上传：'+e.message);}
@@ -254,6 +307,18 @@
       if(state.bookId){$('#result-book').href='/book.html?id='+state.bookId;$('#result-links').hidden=false;}
     }finally{state.busy=false;$('#source-file').disabled=false;update();}
   }
+  async function repairTagsOnly(){
+    if(state.busy || !state.source)return;
+    const id=$('#existing-book').value;
+    if($('input[name="destination"]:checked')?.value!=='existing'||!validId(id)){
+      importStatus('请先选「导入到已有书籍」，并选择正确的作品',true);return;
+    }
+    if(!subjects().length){importStatus('没有要补录的 Tag',true);return;}
+    state.busy=true;update();$('#import-log').textContent='';$('#import-log').hidden=false;
+    try{importStatus('正在补录标签…');const added=await syncBookTags(id);importStatus('补录完成！已关联 '+subjects().length+' 个 EPUB 标签，其中 '+added+' 个为新增关联。章节正文完全未修改。');}
+    catch(e){importStatus('补录失败：'+e.message,true);}
+    finally{state.busy=false;update();}
+  }
   function showCover(zip,path){
     const image=$('#cover-preview');image.hidden=true;
     if(!path||!zip.file(path))return;
@@ -275,10 +340,17 @@
       $('#book-author').value=data.author.slice(0,100);
       $('#book-desc').value=data.description;
       showCover(data.zip,data.coverPath);
-      status('识别成功：'+data.items.length+' 个 Pixiv 篇目，已忽略目录、信息页与附注。每个篇目完整导入一节。');
+      status('识别成功：'+data.items.length+' 个 Pixiv 篇目，'+data.subjects.length+' 个作品 Tag。信息页、目录页和附注已跳过。');
       buildPreview();await refreshBooks();
     }catch(e){status('解析失败：'+e.message,true);}
   }
+  $('#add-pixiv-tag').addEventListener('click',()=>{
+    if(!state.source || state.source.subjects.length>=20)return;
+    state.source.subjects.push('');renderSubjects();
+    $('#pixiv-subject-list .pixiv-tag-row:last-child input')?.focus();
+  });
+  $('#repair-tags').addEventListener('click',()=>void repairTagsOnly());
+  $('#existing-book').addEventListener('change',update);
   $('#source-file').addEventListener('change',onFileChange);
   $('#start-import').addEventListener('click',()=>void runImport());
   $('#confirm-import').addEventListener('change',update);

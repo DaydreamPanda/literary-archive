@@ -33,6 +33,7 @@
 .import-progress>div{height:100%;background:var(--accent);width:0;transition:width .2s}
 .import-choice{display:flex!important;align-items:center;gap:8px;font-size:13px!important;cursor:pointer}
 .import-cover{width:122px;max-height:185px;object-fit:contain;border:1px solid var(--rule);background:var(--paper-soft)}
+.pixiv-tag-row{display:flex;gap:9px;margin:8px 0;align-items:center}.pixiv-tag-row input{flex:1;min-width:0}.pixiv-tag-row button{padding:9px 13px;white-space:nowrap}#pixiv-subject-list{max-width:650px}.pixiv-tag-settings{margin:18px 0;border-top:1px solid var(--rule);padding-top:10px}
 .import-choice input{accent-color:var(--accent)}
 .import-links{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:13px;color:var(--accent)}
 .import-links a{text-decoration:underline;text-underline-offset:4px}
@@ -53,6 +54,13 @@
 <section id="preview-step" class="import-step" hidden><h2><small>STEP 02</small>确认导入内容</h2>
 <div class="import-grid"><div><label for="book-name">书名</label><input id="book-name" type="text" maxlength="200"><label for="book-author">作者</label><input id="book-author" type="text" maxlength="100"><label for="book-desc">简介</label><textarea id="book-desc" maxlength="2000"></textarea></div>
 <div><div class="helper">EPUB 封面</div><img class="import-cover" id="cover-preview" alt="待导入作品封面" hidden><label class="import-choice"><input type="checkbox" id="save-book-cover" checked>导入作品封面</label><label class="import-choice"><input type="checkbox" id="save-chapter-covers" checked>导入各篇独立封面</label><label class="import-choice"><input type="checkbox" id="save-chapter-summaries" checked>导入 Pixiv 篇目简介（最多800字）</label></div></div>
+<div class="pixiv-tag-settings">
+  <h3 style="font-size:16px;font-weight:500">EPUB 作品标签（Tag）</h3>
+  <p class="helper">从原 EPUB 的 dc:subject 自动读取。可修改或移除，最多20个。会关联到整本书，所有章节自动继承。</p>
+  <div id="pixiv-subject-list"></div>
+  <button type="button" id="add-pixiv-tag" class="import-btn secondary">＋ 添加一个 Tag</button>
+  <label class="import-choice"><input type="checkbox" id="import-book-tags" checked>导入作品时自动关联这些 Tag</label>
+</div>
 <p class="helper">每个 Pixiv 篇目作为一个正文单元。勾选的项目会按 EPUB 原始顺序发布。标题可以在下面直接修改。</p>
 <div style="overflow-x:auto"><table class="import-table"><thead><tr><th style="width:46px">导入</th><th>篇目标题</th><th style="min-width:85px">正文字符</th><th style="width:65px">封面</th></tr></thead><tbody id="chapter-rows"></tbody></table></div>
 <label class="import-choice"><input id="group-chapters" type="checkbox" checked>自动建立目录（仅将标题带「上／中／下」的篇目归入同一大章）</label>
@@ -60,7 +68,10 @@
 <section id="destination-step" class="import-step" hidden><h2><small>STEP 03</small>选择导入位置</h2>
 <label class="import-choice"><input type="radio" name="destination" value="new" checked>创建一本新书</label>
 <label class="import-choice"><input type="radio" name="destination" value="existing">导入到已有书籍</label>
-<div id="existing-area" hidden><label for="existing-book">选择已有书籍</label><select id="existing-book"></select><p class="helper">导入到已有书籍时，遇到相同篇目标题会跳过，避免意外重复。启用封面选项可能覆盖现有作品封面。</p></div>
+<div id="existing-area" hidden><label for="existing-book">选择已有书籍</label><select id="existing-book"></select>
+<p class="helper">已经导入过的书，推荐使用下面的「只补录标签」。它不会增加章节，也不会改正文或封面。</p>
+<button type="button" id="repair-tags" class="import-btn secondary" disabled>只补录 EPUB Tag 到这本书</button>
+<p class="helper">如继续选择完整导入，已有同名篇目会跳过，但启用封面选项仍可能覆盖作品封面。</p></div>
 <label class="import-choice"><input type="checkbox" id="confirm-import">已检查标题和章节列表，并确认这些作品可以发布</label>
 <div class="import-actions"><button id="start-import" class="import-btn" disabled>开始导入这本书</button><span id="import-summary" class="helper"></span></div>
 <div class="import-progress"><div id="progress-bar"></div></div><div id="import-status" class="import-status" aria-live="polite"></div>
