@@ -106,7 +106,24 @@ try {
     .filter(b => !b.status || b.status === 'normal');
 }catch(e){$('#series-list').innerHTML=`<div class="error">作品加载失败：${esc(e.message)}。请确认已部署 Novel Site 的 API。${!demo?'<a href="?demo=1">查看演示</a>':''}</div>`;return;}
    if(demo)$('#demo-indicator').classList.remove('hidden');
-   const input=$('#search-books'),chips=$('#tag-filters');let active='全部';const tagNames=['全部',...new Set(books.flatMap(b=>(b.tags||[]).map(t=>t.name)))];
+   const input=$('#search-books'),chips=$('#tag-filters');let active='全部';const tagCounts = new Map();
+
+books.forEach(book => {
+  const uniqueTags = new Set(
+    (book.tags || []).map(t => t.name)
+  );
+  uniqueTags.forEach(name => {
+    tagCounts.set(name, (tagCounts.get(name) || 0) + 1);
+  });
+});
+
+const tagNames = [
+  '全部',
+  ...[...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
+    .slice(0, 10)
+    .map(([name]) => name)
+];
    function draw(){const term=input.value.trim().toLowerCase();let filtered=books.filter(b=>(active==='全部'||(b.tags||[]).some(t=>t.name===active))&&(!term||[b.title,b.author,b.description,...(b.tags||[]).map(t=>t.name)].join(' ').toLowerCase().includes(term)));const series=filtered.filter(b=>classify(b)==='series'),single=filtered.filter(b=>classify(b)==='single');$('#series-list').innerHTML=series.length?series.map(card).join(''):'<div class="archive-empty">此分类暂无系列作品</div>';$('#single-list').innerHTML=single.length?single.map(card).join(''):'<div class="archive-empty">此分类暂无单篇作品</div>';$('#series-count').textContent=series.length+' 部';$('#single-count').textContent=single.length+' 部';}
    chips.innerHTML=tagNames.map(t=>`<button type="button" class="chip ${t==='全部'?'is-active':''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('');chips.addEventListener('click',e=>{const b=e.target.closest('[data-tag]');if(!b)return;active=b.dataset.tag;chips.querySelectorAll('button').forEach(btn=>btn.classList.toggle('is-active',btn===b));draw();});input.addEventListener('input',draw);draw();
  }
