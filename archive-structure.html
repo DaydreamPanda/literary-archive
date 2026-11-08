@@ -11,13 +11,14 @@
 <header class="site-head"><a class="site-identity" href="/index.html"><span class="site-seal">文</span><span><span class="site-name">私人文学档案馆</span><span class="site-kicker">CHAPTER STUDIO</span></span></a><nav class="site-nav"><a href="/admin.html">作者后台</a><a href="/index.html">网站首页</a></nav></header>
 <main class="studio-shell">
   <div class="studio-top">
-    <div><div class="eyebrow">AUTHOR TOOLS / 写作工作台</div><h1>章节管理</h1><p class="studio-muted">一处整理章与节、调整阅读顺序，以及编辑或导出正文。</p></div>
+    <div><div class="eyebrow">AUTHOR TOOLS / 写作工作台</div><h1>章节管理</h1><p class="studio-muted">统一管理系列和单篇作品，可整理目录、编辑正文，还能将章或节移至其他系列或独立发布。</p></div>
     <div class="studio-head-actions"><button id="save-structure" class="studio-btn primary" disabled>保存目录与标题</button><span id="save-state" class="studio-save-state">读取中…</span></div>
   </div>
   <div class="studio-picker">
-    <label for="structure-book">当前作品</label>
+    <label for="structure-book">选择系列或单篇作品</label>
     <select id="structure-book" aria-label="选择作品"></select>
     <a id="new-chapter" class="studio-btn soft" href="/admin.html">＋ 新增章节</a>
+    <button id="open-work-meta" class="studio-btn soft" type="button">编辑作品资料</button>
     <button id="export-book" class="studio-btn soft" type="button">导出全书 TXT</button>
     <a id="structure-preview" class="studio-link" href="/index.html" target="_blank" rel="noopener noreferrer">查看公开目录 ↗</a>
   </div>
@@ -41,5 +42,49 @@
   </section>
   <div class="studio-bottom"><button id="reload-structure" class="studio-btn soft" type="button" hidden>放弃未保存修改，重新加载</button><span id="structure-summary" class="studio-muted"></span></div>
 </main>
+<dialog id="book-meta-dialog" class="studio-transfer-dialog" aria-labelledby="book-meta-heading">
+  <form id="book-meta-form" class="studio-transfer-form">
+    <div class="eyebrow">WORK DETAILS / 作品资料</div>
+    <h2 id="book-meta-heading">编辑作品资料</h2>
+    <label class="studio-transfer-label" for="book-meta-title">作品标题</label>
+    <input id="book-meta-title" maxlength="200" required>
+    <label class="studio-transfer-label" for="book-meta-author">作者署名</label>
+    <input id="book-meta-author" maxlength="100">
+    <label class="studio-transfer-label" for="book-meta-description">简介</label>
+    <textarea id="book-meta-description" maxlength="2000" rows="5"></textarea>
+    <p class="studio-tip">作品封面与 Tag 可在单篇正文的写作编辑器右侧设置。这里修改书名与简介后，首页也会同步更新。</p>
+    <a id="meta-editor-link" class="studio-link" href="/admin.html">打开正文与封面编辑器 ↗</a>
+    <p id="book-meta-feedback" role="status" class="studio-save-state"></p>
+    <div class="studio-transfer-actions"><button id="book-meta-cancel" type="button" class="studio-btn soft">取消</button><button id="book-meta-save" type="submit" class="studio-btn primary">保存作品资料</button></div>
+  </form>
+</dialog>
+<dialog id="transfer-dialog" class="studio-transfer-dialog" aria-labelledby="transfer-heading">
+  <form id="transfer-form" class="studio-transfer-form">
+    <div class="eyebrow">MOVE CHAPTER / 移动篇目</div>
+    <h2 id="transfer-heading">移到其他作品</h2>
+    <p id="transfer-count" class="studio-tip"></p>
+    <label class="studio-transfer-label" for="transfer-target">目标位置</label>
+    <select id="transfer-target" required></select>
+    <section id="transfer-new-fields">
+      <label class="studio-transfer-label" for="transfer-title">新单篇作品标题</label>
+      <input id="transfer-title" maxlength="200" required>
+      <label class="studio-transfer-label" for="transfer-description">作品简介（可选）</label>
+      <textarea id="transfer-description" maxlength="2000" rows="3" placeholder="可稍后在编辑器中修改"></textarea>
+    </section>
+    <section id="transfer-existing-fields" hidden>
+      <label class="studio-transfer-label" for="transfer-group-title">移入后的大章名称</label>
+      <input id="transfer-group-title" maxlength="200">
+      <p class="studio-tip">填写现有大章名称可以归入该章，留用原大章名称则单独成组。</p>
+    </section>
+    <p class="studio-tip">迁移将保留原章节 ID、正文、章节封面、评论、点赞和独立 Tag。新单篇默认继承适用的作品 Tag，并自动标记为「单篇」。空下来的原作品不会自动删除。</p>
+    <label id="transfer-hide-wrap" class="studio-transfer-confirm" hidden><input type="checkbox" id="transfer-hide-empty"> 如果搬走最后的正文，自动下架空作品（可在后台恢复）</label>
+    <label class="studio-transfer-confirm"><input type="checkbox" id="transfer-confirm" required> 我确认要将这些章节移出原作品</label>
+    <div id="transfer-feedback" class="studio-save-state" role="status" aria-live="polite"></div>
+    <div class="studio-transfer-actions">
+      <button id="transfer-cancel" class="studio-btn soft" type="button">取消</button>
+      <button id="transfer-submit" class="studio-btn primary" type="submit">确认移动</button>
+    </div>
+  </form>
+</dialog>
 </body>
 </html>

@@ -14,6 +14,7 @@
   const titleMax = 200;
   let groups = [], chosen = new Set(), organizing = false, focus = null;
   let dirty = false, busy = false, seq = 0, drag = null, currentBook = null;
+  let booksCatalog = [], pendingTransfer = null, currentBookDetails = null;
 
   async function json(path, options = {}) {
     const res = await fetch(path, {credentials:'same-origin',cache:'no-store', ...options});
@@ -33,7 +34,8 @@
     $('#chapter-count').textContent = n;
     $('#save-state').textContent = busy ? '保存中…' : dirty ? '● 存在未保存的修改' : '✓ 已保存';
     $('#save-structure').disabled = busy || !dirty;
-    $('#structure-summary').textContent = `共 ${groups.length} 个大章 · ${n} 个正文单元`;
+    const selected=booksCatalog.find(b=>String(b.id)===String(currentBook));
+    $('#structure-summary').textContent = `${isSingle(selected)?'单篇作品':'系列作品'} · ${groups.length} 个章组 · ${n} 个正文单元`;
     $('#reload-structure').hidden = false;
     $('#selected-count').textContent = `已选 ${chosen.size} 个篇目`;
     $('#merge-selected').disabled = chosen.size < 2;
@@ -224,7 +226,7 @@
   }
   function renderInspector(){
     const root=$('#inspector-content');root.replaceChildren();
-    if(!focus){root.append(node('div','studio-empty','点击左侧章节，在这里编辑标题、归属、正文或导出文件。'));return;}
+    if(!focus){root.append(node('div','studio-empty','点击左侧章节，在这里编辑标题、归属、正文或导出文件。'));if(isSingle(booksCatalog.find(x=>String(x.id)===String(currentBook))))root.append(node('p','studio-tip','当前正在管理单篇作品。上方「编辑作品资料」可修改书名、作者与简介，点击正文则可修改封面和 Tag。'));return;}
     if(focus.type==='group'){
       const group=groups.find(g=>g.key===focus.key);
       if(!group){focus=null;return renderInspector();}
@@ -238,7 +240,11 @@
       bar.append(action('↓ 下移整章',()=>moveGroup(group.key,groups[groups.indexOf(group)+1]?.key||'',true)));
       root.append(bar);
       const bar2=node('div','studio-inspector-actions');bar2.append(action('拆分为独立章节',()=>{if(confirm('把这一回的所有小节拆成独立章？正文不会被删除。'))disbandGroup(group);}));root.append(bar2);
-      root.append(node('p','studio-tip','想把其他章节移进这一回？选中小节，在右侧「所属大章」里选择它；也可以直接拖到左侧大章标题上。'));
+      root.append(node('hr','studio-rule'));
+      const transferActions=node('div','studio-inspector-actions');
+      transferActions.append(action('移动整章到其他系列或单篇 ↗',()=>openTransfer(group.chapters.map(c=>c.id),group.title,group.title)));
+      root.append(transferActions);
+      root.append(node('p','studio-tip','整章移动会带走它下面所有小节。评论、点赞、封面和章节标签仍保留。'));
       return;
     }
     const ch=chapterById(focus.id), g=groupContaining(focus.id);
@@ -268,9 +274,105 @@
     const view=node('a','studio-btn soft','阅读预览 ↗');view.href='/read.html?id='+ch.id;view.target='_blank';view.rel='noopener noreferrer';
     actions.append(edit,view);root.append(actions);
     const more=node('div','studio-inspector-actions');
+    more.append(action('移到其他系列 / 独立成单篇 ↗',()=>openTransfer([ch.id],ch.sectionTitle,g.title)));
     more.append(action('导出 TXT',()=>void exportChapter(ch)));
     more.append(action('删除章节',()=>void deleteChapter(ch),'danger'));root.append(more);
     root.append(node('p','studio-tip','删除会立即执行且无法撤销。修改章名、节名与排序则需要点击顶部保存。'));
+  }
+  function openBookMeta(){
+    if(busy)return;
+    const book=currentBookDetails||booksCatalog.find(b=>String(b.id)===String(currentBook));if(!book)return;
+    $('#book-meta-title').value=book.title||'';
+    $('#book-meta-author').value=book.author||'';
+    $('#book-meta-description').value=book.description||'';
+    $('#book-meta-feedback').textContent='';
+    const first=allChapters()[0];
+    const link=$('#meta-editor-link');link.hidden=!first;
+    if(first)link.href='/chapter-editor.html?id='+first.id;
+    $('#book-meta-dialog').showModal();
+  }
+  async function saveBookMeta(e){
+    e.preventDefault();if(busy)return;
+    const title=clean($('#book-meta-title').value);if(!title){$('#book-meta-feedback').textContent='请填写作品标题';return;}
+    busy=true;$('#book-meta-save').disabled=true;$('#book-meta-feedback').textContent='正在保存…';
+    try{
+      await request('PUT','/api/admin/books/'+currentBook,{title,author:clean($('#book-meta-author').value),description:clean($('#book-meta-description').value)});
+      currentBookDetails={...(currentBookDetails||{}),title,author:clean($('#book-meta-author').value),description:clean($('#book-meta-description').value)};
+      const info=booksCatalog.find(b=>String(b.id)===String(currentBook));
+      if(info)Object.assign(info,{title,author:currentBookDetails.author,description:currentBookDetails.description});
+      populateBookSelect(currentBook);$('#book-meta-dialog').close();notice('作品资料已保存。');
+    }catch(error){$('#book-meta-feedback').textContent='保存失败：'+error.message;}
+    finally{busy=false;$('#book-meta-save').disabled=false;updateSaveUI();}
+  }
+  function openTransfer(ids,title,sourceGroup){
+    if(dirty){notice('请先保存目录改动，再移动到其他作品。',true);return;}
+    if(busy)return;
+    pendingTransfer={ids,title,sourceGroup};
+    const select=$('#transfer-target');select.replaceChildren();
+    const newOption=node('option','','新建单篇作品');newOption.value='new_single';select.append(newOption);
+    const series=booksCatalog.filter(b=>Number(b.id)!==Number(currentBook)&&!isSingle(b));
+    if(series.length){
+      const group=node('optgroup');group.label='移入其他系列';
+      for(const book of series){const op=node('option','',book.title);op.value=String(book.id);group.append(op);}
+      select.append(group);
+    }
+    $('#transfer-count').textContent=ids.length>1?'移动整个「'+title+'」，包含 '+ids.length+' 个小节。':'移动「'+title+'」这一节。';
+    $('#transfer-title').value=title.slice(0,200);
+    $('#transfer-group-title').value=sourceGroup.slice(0,200);
+    $('#transfer-description').value='';
+    $('#transfer-confirm').checked=false;
+    const willEmpty=ids.length===allChapters().length;
+    $('#transfer-hide-wrap').hidden=!willEmpty;
+    $('#transfer-hide-empty').checked=willEmpty&&isSingle(booksCatalog.find(b=>String(b.id)===String(currentBook)));
+    $('#transfer-feedback').textContent='';
+    select.value='new_single';switchTransferMode();
+    $('#transfer-dialog').showModal();
+  }
+  function isSingle(book){return (book.tags||[]).some(t=>/(^单篇$|短篇|one.?shot)/i.test(t.name));}
+  function switchTransferMode(){
+    const create=$('#transfer-target').value==='new_single';
+    $('#transfer-new-fields').hidden=!create;
+    $('#transfer-existing-fields').hidden=create;
+    $('#transfer-title').required=create;
+    $('#transfer-group-title').required=!create;
+  }
+  function closeTransfer(){if(busy)return;pendingTransfer=null;$('#transfer-dialog').close();}
+  async function submitTransfer(e){
+    e.preventDefault();
+    if(!pendingTransfer||busy)return;
+    if(dirty){$('#transfer-feedback').textContent='请先保存当前目录改动。';return;}
+    if(!$('#transfer-confirm').checked){$('#transfer-feedback').textContent='请勾选确认后再移动。';return;}
+    const target=$('#transfer-target').value;
+    const create=target==='new_single';
+    const payload={sourceBookId:Number(currentBook),chapterIds:pendingTransfer.ids,
+      mode:create?'new_single':'existing',hideEmptySource:$('#transfer-hide-empty').checked};
+    if(create){payload.newTitle=clean($('#transfer-title').value);payload.newDescription=clean($('#transfer-description').value);}
+    else{payload.targetBookId=Number(target);payload.targetGroupTitle=clean($('#transfer-group-title').value);}
+    if(create&&!payload.newTitle||!create&&!payload.targetGroupTitle){$('#transfer-feedback').textContent='请填写作品标题或目标大章名称。';return;}
+    const selected=booksCatalog.find(b=>String(b.id)===String(currentBook));
+    const message=create?'将选中的篇目从《'+(selected?.title||'原作品')+'》抽出并创建新单篇？':'将选中的篇目移动到《'+(booksCatalog.find(b=>String(b.id)===String(target))?.title||'目标系列')+'》？';
+    if(!confirm(message+'\n正文、封面、章节标签、评论、点赞和章节链接会保留。'))return;
+    busy=true;$('#transfer-submit').disabled=true;$('#transfer-feedback').textContent='正在移动，请勿关闭页面…';
+    try{
+      const result=await request('POST','/api/admin/archive-transfer',payload);
+      pendingTransfer=null;$('#transfer-dialog').close();
+      const catalog=await json('/api/books');booksCatalog=(catalog.books||[]).filter(b=>!b.status||b.status==='normal');
+      populateBookSelect(result.targetBookId);
+      currentBook=String(result.targetBookId);
+      await load(true);
+      const extra=result.sourceHidden?' 原作品已自动下架，可从后台恢复。':result.sourceEmpty?' 原作品现在为空，仍保留在后台，可自行下架。':'';
+      notice('移动成功！已转移 '+result.movedCount+' 节，并打开目标'+(result.created?'单篇作品':'系列')+'。'+extra);
+    }catch(error){$('#transfer-feedback').textContent='移动失败：'+error.message+'。请检查目录再重试。';}
+    finally{busy=false;$('#transfer-submit').disabled=false;updateSaveUI();}
+  }
+  function populateBookSelect(selected){
+    const select=$('#structure-book');select.replaceChildren();
+    const series=node('optgroup');series.label='系列作品';
+    const singles=node('optgroup');singles.label='单篇作品';
+    for(const b of booksCatalog){const option=node('option','',b.title);option.value=b.id;(isSingle(b)?singles:series).append(option);}
+    if(series.children.length)select.append(series);
+    if(singles.children.length)select.append(singles);
+    if(selected&&booksCatalog.some(x=>String(x.id)===String(selected)))select.value=String(selected);
   }
   async function exportChapter(ch){
     try{const data=await json('/api/chapters/'+ch.id);downloadTxt((ch.sectionTitle||ch.title)+'.txt',data.content||'');notice('已导出该章节。');}
@@ -339,24 +441,24 @@
       const [data,structure]=await Promise.all([
         json('/api/books/'+currentBook),json('/api/archive-structure?bookId='+currentBook+'&t='+Date.now())
       ]);
+      currentBookDetails=data.book;
       initializeTree(data.chapters||[],structure.items||[]);
       $('#structure-preview').href='/book.html?id='+currentBook;
       $('#new-chapter').href='/chapter-editor.html?book='+currentBook;
       $('#structure-tools').hidden=false;
       render();
-      if(!keepStatus)notice('已载入《'+data.book.title+'》。选择左侧章或节，在右侧进行编辑。');
+      if(!keepStatus)notice('已载入《'+data.book.title+'》（'+(isSingle(booksCatalog.find(b=>String(b.id)===String(currentBook)))?'单篇作品':'系列作品')+'）。选择左侧章或节，在右侧进行编辑。');
     }catch(e){notice('加载目录失败：'+e.message,true);}
   }
   async function init(){
     try{
       const me=await json('/api/me');if(me.role!=='super_admin')throw Error('该页面仅限超级管理员');
       const response=await json('/api/books');
-      const books=(response.books||[]).filter(b=>!b.status||b.status==='normal');
+      booksCatalog=(response.books||[]).filter(b=>!b.status||b.status==='normal');
       const select=$('#structure-book');
-      if(!books.length){notice('请先在后台创建一本书。');return;}
-      for(const b of books){const opt=node('option','',b.title);opt.value=b.id;select.append(opt);}
+      if(!booksCatalog.length){notice('请先在后台创建一本作品。');return;}
       const requested=new URLSearchParams(location.search).get('bookId');
-      if(idOK(requested)&&books.some(b=>String(b.id)===requested))select.value=requested;
+      populateBookSelect(requested);
       currentBook=select.value;
       select.addEventListener('change',async()=>{
         if(dirty&&!confirm('切换书籍将放弃未保存修改，确定继续？')){select.value=currentBook;return;}
@@ -369,6 +471,10 @@
       $('#split-selected').addEventListener('click',()=>{if(chosen.size)detachChapters([...chosen]);});
       $('#delete-selected').addEventListener('click',()=>void deleteSelected());
       $('#export-book').addEventListener('click',()=>void exportBook());
+      $('#open-work-meta').addEventListener('click',openBookMeta);
+      $('#book-meta-cancel').addEventListener('click',()=>{if(!busy)$('#book-meta-dialog').close();});
+      $('#book-meta-form').addEventListener('submit',e=>void saveBookMeta(e));
+      $('#book-meta-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();});
       $('#select-all').addEventListener('click',()=>{
         const search=clean($('#chapter-search').value).toLocaleLowerCase();
         const visible=allChapters().filter(c=>!search||(c.sectionTitle+' '+c.title+' '+(groupContaining(c.id)?.title||'')).toLocaleLowerCase().includes(search));
@@ -376,6 +482,10 @@
       });
       $('#save-structure').addEventListener('click',()=>void save());
       $('#reload-structure').addEventListener('click',()=>{if(!dirty||confirm('确认放弃所有尚未保存的修改？'))void load();});
+      $('#transfer-target').addEventListener('change',switchTransferMode);
+      $('#transfer-cancel').addEventListener('click',closeTransfer);
+      $('#transfer-form').addEventListener('submit',e=>void submitTransfer(e));
+      $('#transfer-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else pendingTransfer=null;});
       window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
       await load();
     }catch(e){notice('无法打开章节工作台：'+e.message+'。请先登录作者后台。',true);}
