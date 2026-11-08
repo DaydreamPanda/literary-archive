@@ -224,8 +224,11 @@
         <h3>${esc(b.title)}</h3>
         <div class="book-meta">
           ${esc((b.tags || []).map(t => t.name).slice(0, 2).join(' · ')) || '原创作品'}
-          · ${Number(b.chapter_count) || 0} 章
-          · ${((Number(b.total_words) || 0) / 10000).toFixed(1)} 万字
+
+· ${classify(b) === 'single'
+  ? `${Number(b.total_words) || 0} 字`
+  : `${Number(b.chapter_count) || 0} 章 · ${((Number(b.total_words) || 0) / 10000).toFixed(1)} 万字`}
+
         </div>
         <p class="book-excerpt">${esc(b.description || '暂无简介。')}</p>
       </div>
