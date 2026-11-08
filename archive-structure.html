@@ -2,46 +2,44 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>手动整理章与节 · 文学档案馆</title>
+<meta name="robots" content="noindex,nofollow"><title>章节工作台 · 私人文学档案馆</title>
 <link rel="stylesheet" href="/archive.css">
-<style>
-.manual-shell{max-width:1100px;margin:35px auto 90px;padding:0 20px}
-.manual-card{border:1px solid var(--rule);background:var(--paper-light);padding:22px 24px;margin:19px 0}
-.manual-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:15px 0}
-.manual-controls input{flex:1;min-width:180px}
-.manual-controls input,.manual-controls select,.manual-row input,.manual-row select{border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:9px 10px;border-radius:3px;font:inherit}
-.manual-btn{background:var(--ink);border:1px solid var(--ink);color:var(--paper);padding:9px 14px;cursor:pointer;font-size:13px;border-radius:3px}
-.manual-btn.light{background:var(--paper);color:var(--ink);border-color:var(--rule)}
-.manual-btn:disabled{opacity:.45;cursor:default}
-.manual-note{font-size:13px;line-height:1.8;color:var(--muted)}
-.manual-list{display:grid;gap:9px}
-.manual-row{display:grid;grid-template-columns:24px 26px minmax(160px,1.3fr) minmax(130px,1fr) minmax(110px,.8fr) 85px 95px;gap:11px;align-items:center;padding:13px;border:1px solid var(--rule);background:var(--paper)}
-.manual-row.dragging{opacity:.4}.manual-row.dragover{outline:2px solid var(--accent);outline-offset:1px}
-.manual-row input[type=text]{width:100%;min-width:0;font-size:13px}.manual-row select{width:100%;font-size:13px}
-.manual-row .source{font-size:13px;overflow-wrap:anywhere}.manual-row .source small{display:block;color:var(--muted);margin-top:4px}
-.drag-handle{font-size:20px;color:var(--muted);cursor:grab;text-align:center;user-select:none}
-.move-actions{display:flex;gap:5px}.move-actions button{padding:7px 9px}
-.manual-status{padding:10px 0;color:var(--ink-soft);font-size:13px;white-space:pre-wrap}
-.manual-summary{white-space:pre-wrap;font-size:13px;line-height:1.85;color:var(--ink-soft)}
-@media(max-width:850px){.manual-row{grid-template-columns:22px 20px minmax(0,1fr) 84px;gap:8px}.manual-row .source{grid-column:3}.manual-row .group-title,.manual-row .section-title,.manual-row .chapter-kind{grid-column:3 / 5}.manual-row .move-actions{grid-column:4;grid-row:1 / 3}.manual-row .select-chapter{grid-row:1}.manual-row .drag-handle{grid-row:1}}
-</style>
+<link rel="stylesheet" href="/archive-structure-studio.css">
 <script defer src="/archive-structure-admin.js"></script>
 </head>
 <body>
-<header class="site-head"><a class="site-identity" href="/index.html"><span class="site-seal">文</span><span><span class="site-name">手动章节目录</span><span class="site-kicker">MANUAL CHAPTER ORGANIZER</span></span></a><nav class="site-nav"><a href="/admin.html">作者后台</a><a href="/index.html">返回首页</a></nav></header>
-<main class="manual-shell">
-<div class="eyebrow">AUTHOR TOOLS / 目录编辑</div><h1>手动合并与排序</h1>
-<p class="manual-note">每个已发布的篇目依旧是一份完整正文。选中多个篇目，填一个「大章名称」并点击「合并所选」，它们就会显示为可展开的一章。拖动「☰」或者点击 ↑ ↓ 调整阅读顺序。所有更改在点击保存后才会生效。</p>
-<div id="structure-status" class="manual-status" aria-live="polite">正在读取管理员权限…</div>
-<section id="structure-tools" hidden>
-<div class="manual-card">
-<div class="manual-controls"><label for="structure-book">选择作品</label><select id="structure-book"></select><a id="structure-preview" class="manual-btn light" href="/index.html" target="_blank" rel="noopener noreferrer">查看目录</a></div>
-<div class="manual-controls"><input id="merge-title" maxlength="200" placeholder="大章标题，如：第一回 痴情洪老汉"><button type="button" id="merge-selected" class="manual-btn">合并所选</button><button type="button" id="split-selected" class="manual-btn light">拆分所选</button><button type="button" id="select-all" class="manual-btn light">全选 / 清空</button></div>
-<p class="manual-note">也可以直接编辑每行的「所属大章」：相同名称会合并；不同名称会拆开。小节标题只用于展开后的显示。改变某个章节的标题或正文，请进入独立写作编辑器。</p>
-<div id="structure-rows" class="manual-list"></div>
-<div class="manual-controls"><button type="button" id="save-structure" class="manual-btn">保存目录与顺序</button><button type="button" id="reload-structure" class="manual-btn light">放弃改动 / 重新加载</button></div>
-<div id="structure-summary" class="manual-summary"></div>
-</div>
-</section>
+<header class="site-head"><a class="site-identity" href="/index.html"><span class="site-seal">文</span><span><span class="site-name">私人文学档案馆</span><span class="site-kicker">CHAPTER STUDIO</span></span></a><nav class="site-nav"><a href="/admin.html">作者后台</a><a href="/index.html">网站首页</a></nav></header>
+<main class="studio-shell">
+  <div class="studio-top">
+    <div><div class="eyebrow">AUTHOR TOOLS / 写作工作台</div><h1>章节管理</h1><p class="studio-muted">一处整理章与节、调整阅读顺序，以及编辑或导出正文。</p></div>
+    <div class="studio-head-actions"><button id="save-structure" class="studio-btn primary" disabled>保存目录与标题</button><span id="save-state" class="studio-save-state">读取中…</span></div>
+  </div>
+  <div class="studio-picker">
+    <label for="structure-book">当前作品</label>
+    <select id="structure-book" aria-label="选择作品"></select>
+    <a id="new-chapter" class="studio-btn soft" href="/admin.html">＋ 新增章节</a>
+    <button id="export-book" class="studio-btn soft" type="button">导出全书 TXT</button>
+    <a id="structure-preview" class="studio-link" href="/index.html" target="_blank" rel="noopener noreferrer">查看公开目录 ↗</a>
+  </div>
+  <div id="structure-status" class="studio-notice" role="status" aria-live="polite">正在检查登录状态…</div>
+  <section id="structure-tools" class="studio-workspace" hidden>
+    <div class="studio-panel studio-tree-panel">
+      <div class="studio-panel-head"><div><h2>章与节</h2><p class="studio-muted"><span id="chapter-count">0</span> 个正文单元 · 拖动左侧手柄排序</p></div><button id="toggle-organize" class="studio-btn soft" type="button">多选整理</button></div>
+      <div class="studio-filter"><input id="chapter-search" type="search" placeholder="搜索标题（搜索时暂停拖动）" aria-label="搜索章节"><span id="search-hint"></span></div>
+      <div id="selection-panel" class="studio-selection" hidden>
+        <p id="selected-count">已选 0 篇</p>
+        <div class="studio-merge-form"><input id="merge-title" type="text" maxlength="200" placeholder="合并后的大章名称"><button id="merge-selected" class="studio-btn primary" type="button">合并所选</button></div>
+        <div class="studio-inline-actions"><button id="split-selected" class="studio-btn soft" type="button">拆分选中</button><button id="delete-selected" class="studio-btn danger" type="button">删除选中</button><button id="select-all" class="studio-btn soft" type="button">全选可见</button><button id="cancel-organize" class="studio-btn ghost" type="button">完成整理</button></div>
+      </div>
+      <div id="chapter-tree" class="studio-tree" aria-label="章节目录"></div>
+      <div class="studio-tree-foot">修改暂存在本页面。确认后点击顶部「保存目录与标题」。</div>
+    </div>
+    <aside class="studio-panel studio-inspector">
+      <div class="studio-panel-head"><h2>详情</h2><span class="studio-muted">选中左侧内容</span></div>
+      <div id="inspector-content" class="studio-inspector-content"><div class="studio-empty">点击一个大章或小节，在这里修改标题和归属。</div></div>
+    </aside>
+  </section>
+  <div class="studio-bottom"><button id="reload-structure" class="studio-btn soft" type="button" hidden>放弃未保存修改，重新加载</button><span id="structure-summary" class="studio-muted"></span></div>
 </main>
-</body></html>
+</body>
+</html>
