@@ -1,54 +1,70 @@
-/* Per-chapter additional tags. Book tags remain inherited automatically.
- * Stored as a JSON list of existing tag IDs under site_settings.
- * No schema migration or new D1 tables required.
+/* Chapter tags: default to book tags; explicit per-chapter selections can add/remove any tag.
+ * Backward compatibility: legacy JSON arrays represent extra tags added to inherited book tags.
  */
-import {checkAdmin,checkBookOwnership,parseJsonBody,validateId} from './_utils.js';
+import { checkAdmin, checkBookOwnership, parseJsonBody, validateId } from './_utils.js';
 
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}});}
-function idsFrom(raw){
-  try{const value=JSON.parse(raw || '[]');return Array.isArray(value) ? [...new Set(value.map(Number).filter(Number.isSafeInteger).filter(x=>x>0))].slice(0,20):[];}
-  catch{return [];}
+const respond = (data, status = 200) => Response.json(data, {status, headers:{'Cache-Control':'no-store'}});
+function uniqueIds(values) {
+  return [...new Set(values.map(Number).filter(Number.isSafeInteger).filter(x => x > 0))];
 }
-async function chapterAndBook(env,id){
-  return env.DB.prepare('SELECT c.id,c.book_id,b.status FROM chapters c JOIN books b ON b.id=c.book_id WHERE c.id=?').bind(id).first();
+function parseSetting(raw) {
+  if (!raw) return {mode:'inherit', ids:[]};
+  try {
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) return {mode:'legacy-extra', ids:uniqueIds(data)};
+    if (data && data.mode === 'custom' && Array.isArray(data.tagIds))
+      return {mode:'custom', ids:uniqueIds(data.tagIds)};
+  } catch {}
+  return {mode:'inherit', ids:[]};
 }
-async function currentIds(env,id){
-  const row=await env.DB.prepare('SELECT value FROM site_settings WHERE key=?').bind('archive_chapter_tags_'+id).first();
-  return idsFrom(row?.value);
-}
-async function tagRows(env,ids){
-  if(!ids.length)return [];
-  const q=ids.map(()=>'?').join(',');
-  const {results}=await env.DB.prepare(`SELECT id,name,color FROM tags WHERE id IN (${q})`).bind(...ids).all();
-  const lookup=new Map((results||[]).map(x=>[Number(x.id),x]));
-  return ids.map(id=>lookup.get(Number(id))).filter(Boolean);
-}
-export async function onRequestGet({request,env}){
-  const id=new URL(request.url).searchParams.get('chapterId');
-  if(!validateId(id||''))return json({error:'章节编号无效'},400);
-  const chapter=await chapterAndBook(env,id);
-  if(!chapter||(chapter.status&&chapter.status!=='normal'))return json({error:'章节不存在'},404);
-  const [extraIds,bookTags]=await Promise.all([
-    currentIds(env,id),
-    env.DB.prepare('SELECT t.id,t.name,t.color FROM book_tags bt JOIN tags t ON t.id=bt.tag_id WHERE bt.book_id=?').bind(chapter.book_id).all()
+async function readContext(env, chapterId) {
+  const chapter = await env.DB.prepare(`SELECT c.id,c.book_id,b.status
+    FROM chapters c JOIN books b ON b.id=c.book_id WHERE c.id=?`).bind(chapterId).first();
+  if (!chapter || (chapter.status && chapter.status !== 'normal')) return null;
+  const [all, assigned, saved] = await Promise.all([
+    env.DB.prepare('SELECT id,name,color FROM tags ORDER BY name').all(),
+    env.DB.prepare('SELECT tag_id FROM book_tags WHERE book_id=?').bind(chapter.book_id).all(),
+    env.DB.prepare('SELECT value FROM site_settings WHERE key=?').bind('archive_chapter_tags_'+chapterId).first()
   ]);
-  return json({ownTags:await tagRows(env,extraIds),bookTags:bookTags.results||[]});
+  const tags = (all.results || []).map(t => ({...t, id:Number(t.id)}));
+  const lookup = new Map(tags.map(t=>[t.id,t]));
+  const bookIds = uniqueIds((assigned.results||[]).map(x=>x.tag_id));
+  const setting = parseSetting(saved?.value);
+  const ids = setting.mode === 'custom' ? setting.ids : uniqueIds([...bookIds, ...setting.ids]);
+  const chosen = ids.filter(id => lookup.has(id));
+  return {chapter, tags, bookIds, setting, chosen, lookup};
 }
-export async function onRequestPut({request,env}){
-  const auth=await checkAdmin(request,env);
-  if(!auth.ok)return json({error:'请先登录后台'},401);
-  const id=new URL(request.url).searchParams.get('chapterId');
-  if(!validateId(id||''))return json({error:'章节编号无效'},400);
-  const chapter=await chapterAndBook(env,id);
-  if(!chapter)return json({error:'章节不存在'},404);
-  if(!await checkBookOwnership(auth,env,chapter.book_id))return json({error:'无权限修改此章节'},403);
-  const data=await parseJsonBody(request);
-  if(!data||!Array.isArray(data.tagIds)||data.tagIds.length>20)return json({error:'最多选择20个标签'},400);
-  if(!data.tagIds.every(v=>Number.isSafeInteger(v)&&v>0))return json({error:'标签编号无效'},400);
-  const ids=[...new Set(data.tagIds)];
-  const existing=await tagRows(env,ids);
-  if(existing.length!==ids.length)return json({error:'部分标签不存在，请刷新后重试'},400);
-  await env.DB.prepare('INSERT INTO site_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
-    .bind('archive_chapter_tags_'+id,JSON.stringify(ids)).run();
-  return json({success:true,ownTags:existing});
+function toRows(ids, lookup) {return ids.map(id => lookup.get(id)).filter(Boolean);}
+export async function onRequestGet({request,env}) {
+  const id = new URL(request.url).searchParams.get('chapterId');
+  if (!validateId(id||'')) return respond({error:'章节编号无效'},400);
+  const context = await readContext(env,id);
+  if (!context) return respond({error:'章节不存在'},404);
+  const {bookIds, setting, chosen, lookup} = context;
+  return respond({
+    mode:setting.mode, explicit:setting.mode==='custom',
+    bookTags:toRows(bookIds,lookup),
+    effectiveTags:toRows(chosen,lookup),
+    ownTags:toRows(chosen.filter(id=>!bookIds.includes(id)),lookup)
+  });
+}
+export async function onRequestPut({request,env}) {
+  const auth = await checkAdmin(request,env);
+  if (!auth.ok) return respond({error:'请先登录后台'},401);
+  const id = new URL(request.url).searchParams.get('chapterId');
+  if (!validateId(id||'')) return respond({error:'章节编号无效'},400);
+  const context = await readContext(env,id);
+  if (!context) return respond({error:'章节不存在'},404);
+  if (!await checkBookOwnership(auth,env,context.chapter.book_id))return respond({error:'无权限修改此章节'},403);
+  const body = await parseJsonBody(request);
+  if (!body || !Array.isArray(body.tagIds) || body.tagIds.length>20 ||
+      !body.tagIds.every(id=>Number.isSafeInteger(id)&&id>0))
+    return respond({error:'请选择不超过20个有效标签'},400);
+  const ids=uniqueIds(body.tagIds);
+  if (ids.some(id=>!context.lookup.has(id)))return respond({error:'部分标签不存在，请刷新后重试'},400);
+  // An explicit empty list is meaningful: this chapter has no tags.
+  await env.DB.prepare(`INSERT INTO site_settings(key,value) VALUES(?,?)
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value`)
+    .bind('archive_chapter_tags_'+id, JSON.stringify({mode:'custom',tagIds:ids})).run();
+  return respond({success:true,mode:'custom',effectiveTags:toRows(ids,context.lookup)});
 }
