@@ -1,0 +1,19 @@
+/* Pixiv-inspired author banner. Preserves the archive's paper-and-ink layout. */
+.panda-profile-banner{position:relative;overflow:hidden;width:100%;aspect-ratio:2.8/1;max-height:390px;margin:27px 0 0;background:var(--paper-soft);border:1px solid var(--rule);box-shadow:var(--shadow)}
+.panda-profile-banner[hidden]{display:none!important}
+.panda-profile-banner img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 50%}
+.has-panda-profile-banner .hero-grid{margin-top:24px}
+.panda-banner-tools{display:grid;gap:11px;border:1px solid var(--rule);padding:18px;background:var(--paper)}
+.panda-banner-tools h2{font-size:18px;font-weight:500;margin:0}
+.panda-banner-tools .panda-banner-help{font-size:12px;line-height:1.75;color:var(--ink-soft);margin:0}
+.panda-banner-tools .panda-banner-preview{width:100%;aspect-ratio:2.8/1;max-height:260px;border:1px solid var(--rule);background:var(--paper-soft);display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:13px}
+.panda-banner-preview img{width:100%;height:100%;object-fit:cover;object-position:center 50%;display:block}
+.panda-banner-tools input[type=file]{max-width:100%;font-size:13px;color:var(--ink)}
+.panda-banner-tools input[type=range]{width:100%;accent-color:var(--accent)}
+.panda-banner-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.panda-banner-actions button{font:inherit;font-size:13px;padding:9px 14px;cursor:pointer;border:1px solid var(--rule);background:var(--paper-light);color:var(--ink)}
+.panda-banner-actions button.primary{background:var(--ink);color:var(--paper-light);border-color:var(--ink)}
+.panda-banner-actions button:disabled{opacity:.5;cursor:not-allowed}
+.panda-banner-status{font-size:12px;color:var(--ink-soft);min-height:18px}
+@media(max-width:780px){.panda-profile-banner{aspect-ratio:2.2/1;margin-top:16px}.has-panda-profile-banner .hero-grid{margin-top:18px}}
+@media(max-width:440px){.panda-profile-banner{aspect-ratio:1.8/1;max-height:200px}.panda-banner-tools{padding:13px}}
